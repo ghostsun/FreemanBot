@@ -1,0 +1,17 @@
+{
+  "name": "freeman",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Freeman",
+  "license": "ISC",
+  "dependencies": {
+    "canvas": "^3.1.2",
+    "mineflayer": "^4.32.0",
+    "mineflayer-pathfinder": "^2.4.5",
+    "prismarine-viewer": "^1.32.0"
+  }
+}
