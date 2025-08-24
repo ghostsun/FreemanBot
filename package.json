@@ -4,12 +4,13 @@
   "description": "",
   "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node main.js"
   },
   "author": "Freeman",
   "license": "ISC",
   "dependencies": {
     "canvas": "^3.1.2",
+    "js-yaml": "^4.1.0",
     "mineflayer": "^4.32.0",
     "mineflayer-pathfinder": "^2.4.5",
     "prismarine-viewer": "^1.32.0"

@@ -1,0 +1,26 @@
+# Server Configuration
+runningLevel: debug  # debug, info, warn, error
+bossName: 'Annie'
+rangeGoal: 1
+
+# minecraft server settings
+host:
+  # host: 'localhost'
+  host: '192.168.1.88'
+  port: 25565
+  auth: 'offline'
+  # version: '1.20.1'
+
+# Bot Settings
+bot:
+  username: 'FreemanBot'  # Default bot username
+
+# Pathfinding Settings
+pathfinding:
+  thinkTimeout: 5000      # Timeout in ms
+  maxDistance: 50         # Maximum pathfinding distance
+
+# Debug Settings
+debug:
+  showPath: true
+  showGoals: true
