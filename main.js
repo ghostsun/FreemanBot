@@ -14,6 +14,9 @@ const RANGE_GOAL = config.get('rangeGoal') // 1 block away from the player
 let currentTask = null
 let currentStep = 0
 
+// 可以被open的物品数组
+const canBeOpenItems = ['chest', 'barrel']
+
 // Fieldland 是一块方形农田，西北角坐标 + 长度 + 宽度
 // (-6, 63, 167) (5, 63, 185)
 const fieldPosition = {
@@ -84,7 +87,7 @@ bot.once('spawn', () => {
 
     bot.on('goal_reached', () => {
       console.log(`I have arrived at ${bot.entity.position}`)
-      bot.chat(`I have arrived at ${bot.entity.position}`)
+      // bot.chat(`I have arrived at ${bot.entity.position}`)
     })
 
     bot.on('path_reset', (reason) => {
@@ -281,10 +284,78 @@ bot.once('spawn', () => {
 
           // endTask(command)
           return
-        } else {
+          // 打开附近的容器，例如箱子或桶
+        }else {
           bot.chat(`/tell ${username} What's mean ${message} ?`)
           return
         }
+      } else if (command.startsWith('open')) {
+          const cmd = command.split(' ')
+          if(cmd.length === 2) {
+            // 判断第二个参数是否在canBeOpenItems中
+            if (!canBeOpenItems.includes(cmd[1])) {
+              bot.chat(`I don't know any blocks with name ${cmd[1]}.`)
+              return
+            }
+            console.log(`I am going to open the nearest ${cmd[1]}`)
+            let openItemPosition = bot.findBlock({
+              matching: bot.registry.blocksByName[cmd[1]].id,
+              maxDistance: 64
+            })
+            if (!openItemPosition) {
+              bot.chat(`I don't see any ${cmd[1]} nearby.`)
+              return
+            }
+            console.log(`I have found the nearest ${cmd[1]}, my position is ${openItemPosition.position}`)
+            // bot.pathfinder.setMovements(defaultMove)
+            // bot.pathfinder.setGoal(new GoalNear(openItemPosition.position.x, openItemPosition.position.y, openItemPosition.position.z, RANGE_GOAL))
+            bot.pathfinder.goto(new GoalNear(openItemPosition.position.x, openItemPosition.position.y, openItemPosition.position.z, RANGE_GOAL)).then(() => {
+              console.log(`I have closed the nearest ${cmd[1]}, my position is ${bot.entity.position}`)
+              bot.waitForTicks(10)
+              console.log(`Opening the nearest ${cmd[1]}`)
+              bot.chat(`Opening the nearest ${cmd[1]}`)
+              bot.openContainer(openItemPosition).then((openItem) => {
+                items = openItem.containerItems()
+                sayItems(items)
+                openItem.close()
+                console.log(`I have closed the nearest ${cmd[1]}`)
+              }).catch((err) => {
+                console.error(err)
+                bot.chat(`I can't open the nearest ${cmd[1]}`)
+              })
+            }).catch((err) => {
+              console.error(err)
+              bot.chat(`I can't go to the nearest ${cmd[1]}`)
+            })
+            return
+          } else {
+            bot.chat(`/tell ${username} What's mean ${message} ?`)
+            return
+          }
+      } else if (command.startsWith('get')) {
+        const cmd = command.split(' ')
+        console.log(cmd)
+        if (cmd.length === 2) {
+          const item = cmd[1]
+          getThingsFromContainer(item, 1, 'chest')
+        } else if(cmd.length === 3) {
+          const item = cmd[1]
+          const count = parseInt(cmd[2])
+          // 判断count是否为数字
+          if(isNaN(count)) {
+            getThingsFromContainer(item, 1, cmd[2])
+          } else {
+            getThingsFromContainer(item, count, 'chest')
+          }
+        } else if(cmd.length === 4) {
+          const item = cmd[1]
+          const count = parseInt(cmd[2])
+          const container = cmd[3]
+          getThingsFromContainer(item, count, container)
+        } else {
+          bot.chat(`/tell ${username} What's mean ${message} ?`)
+        }
+        return
       }
 
       switch (command) {
@@ -424,9 +495,12 @@ bot.once('spawn', () => {
             })
           })
           break
-        default:
-          bot.chat('I don\'t understand you !')
+        case 'plow':
+          plowField()
           break
+        default:
+        bot.chat('I don\'t understand you !')
+        break
       }
       // bot.once('spawn', () => {
       //   // keep your eyes on the target, so creepy!
@@ -446,17 +520,6 @@ bot.once('spawn', () => {
       // console.log("Starting to follow you !")
     })
 })
-
-function moveTo(x, y, z, defaultMove) {
-    bot.pathfinder.setMovements(defaultMove)
-    if (x && y && z) {
-      bot.pathfinder.setGoal(new GoalBlock(x, y, z))
-      console.log(`I will go to x: ${x}, y: ${y}, z: ${z}`)
-    } else if (x && z) {
-        bot.pathfinder.setGoal(new GoalXZ(x, z))
-        console.log(`I will go to x: ${x}, z: ${z}`)
-    }
-}
 
 function startTask(task, step = 0) {
     if (currentTask || currentStep !== step) {
@@ -493,6 +556,16 @@ function itemToString (item) {
   } else {
     return '(nothing)'
   }
+}
+
+function itemByName (items, name) {
+  let item
+  let i
+  for (i = 0; i < items.length; ++i) {
+    item = items[i]
+    if (item && item.name === name) return item
+  }
+  return null
 }
 
 function sayItems(items) {
@@ -556,82 +629,6 @@ async function harvestingWheat() {
           }
           await bot.waitForTicks(10)
         }
-        // for (let z = startZ; z < startZ + fieldPosition.length; z++) {
-        //   for (let x = startX; x < startX + fieldPosition.width; x++) {
-        //     bot.pathfinder.setGoal(new GoalXZ(x, z))
-        //     if (!await waitForBotAtPosition(x = startX, y=null, z = startZ)) {
-        //       console.log(`I can't go to x: ${startX}, z: ${startZ}`)
-        //       stopTask()
-        //       return
-        //     }
-        //     const wheat = await bot.findBlock({
-        //       maxDistance: 1,
-        //       matching: (block) => {
-        //         return block && block.type === bot.registry.blocksByName.wheat.id && block.metadata === 7
-        //       }
-        //     })
-        //     if (wheat) {
-        //       console.log(`Harvesting wheat at ${wheat}`)
-        //       await bot.dig(wheat)
-        //     }
-        //   }
-        // }
-        
-        
-        
-        // Start from the northwest corner of the field
-        // let currentX = fieldPosition.x + 1; // Start one block in from the edge
-        // let currentZ = fieldPosition.z + 1; // Start one block in from the edge
-        // const endX = fieldPosition.x + fieldPosition.length - 1;
-        // const endZ = fieldPosition.z + fieldPosition.width - 1;
-        // let movingEast = true;
-        // console.log(`I will harvest the entire field! My position is ${bot.entity.position}`)
-        // bot.chat(`I will harvest the entire field! My position is ${bot.entity.position}`)
-
-        // // Move to the starting position
-        // const defaultMove = new Movements(bot)
-        // await moveTo(currentX, fieldPosition.y, currentZ, defaultMove);
-        // await waitForBotAtPosition(currentX, fieldPosition.y, currentZ);
-        // console.log(`I have arrived at start position ${bot.entity.position}`)
-        // bot.chat(`I have arrived at start position ${bot.entity.position}`)
-
-        // console.log(`I will harvest the entire field!`)
-        // await harvestAround(currentX, currentZ);
-        
-
-        // Harvest in a snake pattern
-        // while (currentZ <= endZ) {
-        //     // Harvest current position and surrounding blocks
-        //     console.log(`Harvesting around x: ${currentX}, z: ${currentZ}`)
-        //     await harvestAround(currentX, currentZ);
-            
-        //     // Move to next position in the row
-        //     if (movingEast) {
-        //         if (currentX < endX) {
-        //             currentX++;
-        //             await moveTo(currentX, fieldPosition.y, currentZ, defaultMove);
-        //         } else {
-        //             movingEast = false;
-        //             currentZ++;
-        //             if (currentZ <= endZ) {
-        //                 await moveTo(currentX, fieldPosition.y, currentZ, defaultMove);
-        //             }
-        //         }
-        //     } else {
-        //         if (currentX > fieldPosition.x + 1) {
-        //             currentX--;
-        //             await moveTo(currentX, fieldPosition.y, currentZ, defaultMove);
-        //         } else {
-        //             movingEast = true;
-        //             currentZ++;
-        //             if (currentZ <= endZ) {
-        //                 await moveTo(currentX, fieldPosition.y, currentZ, defaultMove);
-        //             }
-        //         }
-        //     }
-        //     // Small delay to prevent server overload
-        //     await bot.waitForTicks(5);
-        // }
         console.log('Finished harvesting the entire field!');
         bot.chat('Finished harvesting the entire field!')
         stopTask()
@@ -641,6 +638,250 @@ async function harvestingWheat() {
         stopTask()
         return false;
     }
+}
+
+// 犁地
+function plowField() {
+  // 检查随身物品中是否有stone hoe 或者 wooden hoe 或者 iron hoe 或者 diamond hoe 或者 gold hoe
+  const hoe = bot.inventory.items().find(item => {
+    return item && (item.type === bot.registry.itemsByName['stone_hoe'].id 
+      || item.type === bot.registry.itemsByName['wooden_hoe'].id 
+      || item.type === bot.registry.itemsByName['iron_hoe'].id 
+      || item.type === bot.registry.itemsByName['diamond_hoe'].id
+      || item.type === bot.registry.itemsByName['golden_hoe'].id)
+  })
+  if (!hoe) {
+    console.log(`I don't have a hoe`)
+    bot.chat(`I don't have a hoe`)
+    return
+  }
+  // 将hoe装备到手上
+  bot.equip(hoe, 'hand').then(() => {
+    console.log(`I have equipped a hoe`)
+    bot.chat(`I have equipped a hoe`)
+  }).catch((error) => {
+    console.log(`I can't equip a hoe`)
+    bot.chat(`I can't equip a hoe`)
+    return
+  })
+  bot.waitForTicks(10)
+  // 先移动到农田西北角
+  bot.pathfinder.goto(new GoalXZ(fieldPosition.x, fieldPosition.z)).then(async () => {
+    console.log(`I have arrived at ${bot.entity.position}`)
+    bot.waitForTicks(10)
+    console.log(`Plowing the field`)
+    bot.chat(`Plowing the field`)
+    // 逐格检查农田每一格土地是否是farmland,如果不是farmland,则犁地
+    let x = fieldPosition.x
+    let z = fieldPosition.z
+    while( true ) {
+      let landBlockPositions = bot.findBlocks({
+        maxDistance: 1,
+        matching: (block) => {
+          return block && (block.type === bot.registry.blocksByName.grass_block.id 
+            || block.type === bot.registry.blocksByName.granite.id 
+            || block.type === bot.registry.blocksByName.dirt.id
+            || block.type === bot.registry.blocksByName.dirt_path.id
+            || block.type === bot.registry.blocksByName.rooted_dirt.id)
+            && block.type !== bot.registry.blocksByName.farmland.id
+        }
+      })
+      if (!landBlockPositions || landBlockPositions.length < 1) {
+        console.log(`I don't see any needed plowland block nearby.`)
+        continue
+      }
+
+      console.log(`I have found needed plow land blocks, my position is ${bot.entity.position}`)
+      // 遍历输出landBlocks的坐标
+      for (let i = 0; i < landBlockPositions.length; i++) {
+        let landBlockPosition = landBlockPositions[i]
+        console.log(`Before filter land block ${bot.blockAt(landBlockPosition).name} at ${landBlockPosition}`)
+      }
+      
+      // 剔除坐标向下取整后，landBlocks Y轴坐标不相同的 和 距离不在一格范围内的 block, 并且block的位置不在farmland范围内
+      landBlockPositions = landBlockPositions.filter(block => block.y === (fieldPosition.y - 1)
+        && (block.x === Math.floor(bot.entity.position.x) && block.z === Math.floor(bot.entity.position.z)))
+      
+      // 遍历输出landBlocks的坐标
+      for (let i = 0; i < landBlockPositions.length; i++) {
+        let landBlockPosition = landBlockPositions[i]
+        console.log(`After filter land block ${bot.blockAt(landBlockPosition).name} at ${landBlockPosition}`)
+      }
+      
+      // 遍历landBlocks， 对每一格块进行犁地操作
+      for (let i = 0; i < landBlockPositions.length; i++) {
+        await bot.lookAt(landBlockPositions[i]).then(async () => {
+          console.log(`I am facing the land block ${bot.blockAt(landBlockPositions[i]).name} at ${landBlockPositions[i]}`)
+          await bot.activateBlock(bot.blockAt(landBlockPositions[i])).then(() => {
+            bot.waitForTicks(10)
+            console.log(`I have plowed the land ${bot.blockAt(landBlockPositions[i]).name} at ${landBlockPositions[i]}`)
+          }).catch(err => {
+            console.log(`I can't plow the land, because ${err}`)
+            bot.chat(`I can't plow the land, because ${err}`)
+            return
+          })
+          // await bot.useOn(bot.blockAt(landBlockPositions[i]))
+          // await bot.waitForTicks(10)
+          // console.log(`I have plowed the land ${bot.blockAt(landBlockPositions[i]).name} at ${landBlockPositions[i]}`)
+        }).catch((error) => {
+          console.log(`I can't face to the land, because ${error}`)
+          bot.chat(`I can't face to the land, because ${error}`)
+          return
+        })
+      }
+      
+
+      // bot.useOn(landBlock).then(() => {
+      //   console.log(`I have plowed the land at ${landBlock.position}`)
+      // }).catch((error) => {
+      //   console.log(`I can't plow the land, because ${error}`)
+      //   return
+      // })
+
+      // let cropBlock = bot.blockAt(bot.entity.position)
+      // if (cropBlock) {
+      //   console.log(`There is a crop block (${cropBlock.name}) at ${cropBlock.position}`)
+      // } else {
+      //   let landBlock = bot.blockAt(bot.entity.position.offset(0, -1, 0))
+      //   if (landBlock) {
+      //     console.log(`There is a land block (${landBlock.name}) at ${landBlock.position}`)
+      //     if (landBlock.type !== bot.registry.blocksByName.farmland.id) {
+      //       console.log(`Plowing land at ${landBlock.position}`)
+      //       bot.lookAt(landBlock.position).then(() => {
+      //         bot.useOn(landBlock).then(() => {
+      //           console.log(`I have plowed the land at ${landBlock.position}`)
+      //           bot.chat(`I have plowed the land at ${landBlock.position}`)
+      //         }).catch((error) => {
+      //           console.log(`I can't plow the land, because ${error}`)
+      //           bot.chat(`I can't plow the land, because ${error}`)
+      //           return
+      //         })
+      //       }).catch((error) => {
+      //         console.log(`I can't face to the land, because ${error}`)
+      //         bot.chat(`I can't face to the land, because ${error}`)
+      //         return
+      //       })
+      //     }
+      //   }
+      // }
+      x++
+      if (x > fieldPosition.x + fieldPosition.width) {
+        x = fieldPosition.x
+        z++
+        if (z > fieldPosition.z + fieldPosition.length) {
+          break
+        }
+        console.log(`Goto next position: ${x}, ${z}`)
+      }
+      await bot.pathfinder.goto(new GoalXZ(x, z)).then(() => {
+        console.log(`I have arrived at ${bot.entity.position}`)
+      }).catch((error) => {
+        console.log(`I can't go to ${x}, ${z}, because ${error}`)
+        return
+      })
+      await bot.waitForTicks(10)
+    }
+    console.log('Finished plowing the entire field!');
+    bot.chat('Finished plowing the entire field!')
+    stopTask()
+    return true;
+    
+  })
+    try {
+        
+    } catch (error) {
+        
+    }
+}
+
+// 播种
+function plant(seedName) {
+  // 首先去最近的chest中拿取与农田方格数相等的种子
+  getThingsFromContainer(seedName, fieldPosition.width * fieldPosition.length, 'chest')
+  bot.waitForTicks(10)
+  // 去农田西北角
+  bot.pathfinder.goto(new GoalXZ(fieldPosition.x, fieldPosition.z)).then(async () => {
+    console.log(`I have arrived at ${bot.entity.position}`)
+    await bot.waitForTicks(10)
+    // 遍历农田每一个块，进行播种操作
+    let x = fieldPosition.x
+    let z = fieldPosition.z
+    while( true ) {
+      bot.lookAt(new )
+      
+    }
+    
+
+}
+
+// 从容器中拿取指定物品，并指定数量，数量默认是1，容器可以是canBeOpenItems中的任何一种
+async function getThingsFromContainer(itemName, count = 1, containerName) {
+  // 检查item和container是否都存在, 并且container是否在canBeOpenItems中，并且数量不能超过64
+  if (!itemName || !containerName || !canBeOpenItems.includes(containerName) || count > 64) {
+    console.log(`I don't know any blocks with name ${itemName} or container ${containerName}`)
+    bot.chat(`I don't know any blocks with name ${itemName} or container ${containerName}`)
+    return
+  }
+  console.log(`I will get ${count} ${itemName} from ${containerName}`)
+  // 找到最近的容器
+  const containerBlock = bot.findBlock({
+    maxDistance: 64,
+    matching: (block) => {
+      return block && block.type === bot.registry.blocksByName[containerName].id
+    }
+  })
+  if (!containerBlock) {
+    console.log(`I don't see any ${containerName} nearby.`)
+    bot.chat(`I don't see any ${containerName} nearby.`)
+    return
+  }
+  console.log(`I have found the nearest ${containerName}, my position is ${containerBlock.position}`)
+  // 移动到容器位置
+  bot.pathfinder.goto(new GoalNear(containerBlock.position.x, containerBlock.position.y, containerBlock.position.z, RANGE_GOAL)).then(() => {
+    console.log(`I have arrived at ${bot.entity.position}`)
+    bot.chat(`I have arrived at ${bot.entity.position}`)
+    bot.waitForTicks(10)
+    // 打开容器
+    bot.openContainer(containerBlock).then((container) => {
+      console.log(`I have opened ${containerName} nearby.`)
+      bot.chat(`I have opened ${containerName} nearby.`)
+      // 检查容器中是否有指定物品, 并且数量是否足够
+      const items = container.containerItems()
+      if (!items) {
+        console.log(`I don't see any items in ${containerName}`)
+        bot.chat(`I don't see any items in ${containerName}`)
+        container.close()
+        return
+      }
+      sayItems(items)
+      const item = itemByName(items, itemName)
+      if (!item || item.count < count) {
+        console.log(`I don't have enough ${itemName} in ${containerName}`)
+        bot.chat(`I don't have enough ${itemName} in ${containerName}`)
+        container.close()
+        return
+      }
+      // 从容器中拿取指定物品
+      container.withdraw(item.type, null, count).then(() => {
+        console.log(`I have taken ${count} ${itemName} from ${containerName}`)
+        bot.chat(`I have taken ${count} ${itemName} from ${containerName}`)
+        container.close()
+      }).catch((err) => {
+        console.log(`I can't take ${count} ${itemName} from ${containerName}, because ${err}`)
+        bot.chat(`I can't take ${count} ${itemName} from ${containerName}, because ${err}`)
+        container.close()
+      })
+    }).catch((err) => {
+      console.log(`I can't open ${containerName} nearby, because ${err}`)
+      bot.chat(`I can't open ${containerName} nearby, because ${err}`)
+      return
+    })
+
+  }).catch((err) => {
+    console.log(`I can't go to ${containerBlock.position} because ${err}`)
+    bot.chat(`I can't go to ${containerBlock.position} because ${err}`)
+    return
+  })
 }
 
 // 等待bot到达指定位置
