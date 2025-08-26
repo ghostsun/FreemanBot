@@ -3,6 +3,7 @@ const mineflayerViewer = require('prismarine-viewer').mineflayer
 const { pathfinder, Movements } = require('mineflayer-pathfinder')
 const { GoalNear, GoalBlock, GoalXZ, GoalY, GoalInvert, GoalFollow, GoalBreakBlock } = require('mineflayer-pathfinder').goals
 const config = require('./utils/config')
+const { Vec3 } = require('vec3')
 
 // Load configuration
 config.load()
@@ -32,6 +33,11 @@ const fieldChestPosition = {
     y: 63,
     z: 178
 }
+
+const plantAndSeed = [
+  { plant: 'wheat', seed: 'wheat_seeds' },
+  { plant: 'potato', seed: 'potato' },
+]
 
 // Debug logging helper
 function debugLog(message) {
@@ -356,6 +362,15 @@ bot.once('spawn', () => {
           bot.chat(`/tell ${username} What's mean ${message} ?`)
         }
         return
+      } else if (command.startsWith('plant')) {
+        const cmd = command.split(' ')
+        if(cmd.length === 2) {
+          const seedName = cmd[1]
+          plant(seedName)
+        } else {
+          bot.chat(`/tell ${username} What's mean ${message} ?`)
+        }
+        return
       }
 
       switch (command) {
@@ -588,20 +603,9 @@ async function harvestingWheat() {
         defaultMove.allowParkour = false
         bot.pathfinder.setMovements(defaultMove)
 
-        const startX = fieldPosition.x
-        const startZ = fieldPosition.z
-        
-        // console.log(`I will go to x: ${startX}, z: ${startZ}`)
-        // bot.pathfinder.setGoal(new GoalXZ(startX, startZ))
-        // if (!await waitForBotAtPosition(x = startX, y=null, z = startZ)) {
-        //   console.log(`I can't go to x: ${startX}, z: ${startZ}`)
-        //   stopTask()
-        //   return
-        // }
-
         // 循环从农田西北角开始遍历农田每一格，并收获每一格上的小麦
-        let x = startX
-        let z = startZ
+        let x = fieldPosition.x
+        let z = fieldPosition.z
         while( true ) {
           await bot.pathfinder.goto(new GoalXZ(x, z)).then(() => {
             console.log(`I have arrived at ${bot.entity.position}`)
@@ -618,15 +622,12 @@ async function harvestingWheat() {
               })
             }
           })
-          x++
-          if (x > startX + fieldPosition.width) {
-            x = startX
-            z++
-            if (z > startZ + fieldPosition.length) {
-              break
-            }
-            console.log(`Goto next position: ${x}, ${z}`)
+          const nextPosition = nextFieldBlockPosition(x, z)
+          if (!nextPosition) {
+            break
           }
+          x = nextPosition.x
+          z = nextPosition.z
           await bot.waitForTicks(10)
         }
         console.log('Finished harvesting the entire field!');
@@ -643,7 +644,9 @@ async function harvestingWheat() {
 // 犁地
 function plowField() {
   // 检查随身物品中是否有stone hoe 或者 wooden hoe 或者 iron hoe 或者 diamond hoe 或者 gold hoe
-  const hoe = bot.inventory.items().find(item => {
+  const items = bot.inventory.items()
+  sayItems(items)
+  const hoe = items.find(item => {
     return item && (item.type === bot.registry.itemsByName['stone_hoe'].id 
       || item.type === bot.registry.itemsByName['wooden_hoe'].id 
       || item.type === bot.registry.itemsByName['iron_hoe'].id 
@@ -686,93 +689,55 @@ function plowField() {
             && block.type !== bot.registry.blocksByName.farmland.id
         }
       })
-      if (!landBlockPositions || landBlockPositions.length < 1) {
-        console.log(`I don't see any needed plowland block nearby.`)
-        continue
-      }
 
-      console.log(`I have found needed plow land blocks, my position is ${bot.entity.position}`)
-      // 遍历输出landBlocks的坐标
-      for (let i = 0; i < landBlockPositions.length; i++) {
-        let landBlockPosition = landBlockPositions[i]
-        console.log(`Before filter land block ${bot.blockAt(landBlockPosition).name} at ${landBlockPosition}`)
-      }
-      
-      // 剔除坐标向下取整后，landBlocks Y轴坐标不相同的 和 距离不在一格范围内的 block, 并且block的位置不在farmland范围内
-      landBlockPositions = landBlockPositions.filter(block => block.y === (fieldPosition.y - 1)
-        && (block.x === Math.floor(bot.entity.position.x) && block.z === Math.floor(bot.entity.position.z)))
-      
-      // 遍历输出landBlocks的坐标
-      for (let i = 0; i < landBlockPositions.length; i++) {
-        let landBlockPosition = landBlockPositions[i]
-        console.log(`After filter land block ${bot.blockAt(landBlockPosition).name} at ${landBlockPosition}`)
-      }
-      
-      // 遍历landBlocks， 对每一格块进行犁地操作
-      for (let i = 0; i < landBlockPositions.length; i++) {
-        await bot.lookAt(landBlockPositions[i]).then(async () => {
-          console.log(`I am facing the land block ${bot.blockAt(landBlockPositions[i]).name} at ${landBlockPositions[i]}`)
-          await bot.activateBlock(bot.blockAt(landBlockPositions[i])).then(() => {
-            bot.waitForTicks(10)
-            console.log(`I have plowed the land ${bot.blockAt(landBlockPositions[i]).name} at ${landBlockPositions[i]}`)
-          }).catch(err => {
-            console.log(`I can't plow the land, because ${err}`)
-            bot.chat(`I can't plow the land, because ${err}`)
+      // 如果在周边发现了土地，则判断是否为农田，如果不是农田，则犁地
+      if (landBlockPositions && landBlockPositions.length > 0) {
+        console.log(`I have found needed plow land blocks, my position is ${bot.entity.position}`)
+        // 遍历输出landBlocks的坐标
+        for (let i = 0; i < landBlockPositions.length; i++) {
+          let landBlockPosition = landBlockPositions[i]
+          console.log(`Before filter land block ${bot.blockAt(landBlockPosition).name} at ${landBlockPosition}`)
+        }
+        
+        // 剔除坐标向下取整后，landBlocks Y轴坐标不相同的 和 距离不在一格范围内的 block, 并且block的位置不在farmland范围内
+        landBlockPositions = landBlockPositions.filter(block => block.y === (fieldPosition.y - 1)
+          && (block.x === Math.floor(bot.entity.position.x) && block.z === Math.floor(bot.entity.position.z)))
+        
+        // 遍历输出landBlocks的坐标
+        for (let i = 0; i < landBlockPositions.length; i++) {
+          let landBlockPosition = landBlockPositions[i]
+          console.log(`After filter land block ${bot.blockAt(landBlockPosition).name} at ${landBlockPosition}`)
+        }
+        
+        // 遍历landBlocks， 对每一格块进行犁地操作
+        for (let i = 0; i < landBlockPositions.length; i++) {
+          await bot.lookAt(landBlockPositions[i]).then(async () => {
+            console.log(`I am facing the land block ${bot.blockAt(landBlockPositions[i]).name} at ${landBlockPositions[i]}`)
+            await bot.activateBlock(bot.blockAt(landBlockPositions[i])).then(() => {
+              bot.waitForTicks(10)
+              console.log(`I have plowed the land ${bot.blockAt(landBlockPositions[i]).name} at ${landBlockPositions[i]}`)
+            }).catch(err => {
+              console.log(`I can't plow the land, because ${err}`)
+              bot.chat(`I can't plow the land, because ${err}`)
+              return
+            })
+            // await bot.useOn(bot.blockAt(landBlockPositions[i]))
+            // await bot.waitForTicks(10)
+            // console.log(`I have plowed the land ${bot.blockAt(landBlockPositions[i]).name} at ${landBlockPositions[i]}`)
+          }).catch((error) => {
+            console.log(`I can't face to the land, because ${error}`)
+            bot.chat(`I can't face to the land, because ${error}`)
             return
           })
-          // await bot.useOn(bot.blockAt(landBlockPositions[i]))
-          // await bot.waitForTicks(10)
-          // console.log(`I have plowed the land ${bot.blockAt(landBlockPositions[i]).name} at ${landBlockPositions[i]}`)
-        }).catch((error) => {
-          console.log(`I can't face to the land, because ${error}`)
-          bot.chat(`I can't face to the land, because ${error}`)
-          return
-        })
-      }
-      
-
-      // bot.useOn(landBlock).then(() => {
-      //   console.log(`I have plowed the land at ${landBlock.position}`)
-      // }).catch((error) => {
-      //   console.log(`I can't plow the land, because ${error}`)
-      //   return
-      // })
-
-      // let cropBlock = bot.blockAt(bot.entity.position)
-      // if (cropBlock) {
-      //   console.log(`There is a crop block (${cropBlock.name}) at ${cropBlock.position}`)
-      // } else {
-      //   let landBlock = bot.blockAt(bot.entity.position.offset(0, -1, 0))
-      //   if (landBlock) {
-      //     console.log(`There is a land block (${landBlock.name}) at ${landBlock.position}`)
-      //     if (landBlock.type !== bot.registry.blocksByName.farmland.id) {
-      //       console.log(`Plowing land at ${landBlock.position}`)
-      //       bot.lookAt(landBlock.position).then(() => {
-      //         bot.useOn(landBlock).then(() => {
-      //           console.log(`I have plowed the land at ${landBlock.position}`)
-      //           bot.chat(`I have plowed the land at ${landBlock.position}`)
-      //         }).catch((error) => {
-      //           console.log(`I can't plow the land, because ${error}`)
-      //           bot.chat(`I can't plow the land, because ${error}`)
-      //           return
-      //         })
-      //       }).catch((error) => {
-      //         console.log(`I can't face to the land, because ${error}`)
-      //         bot.chat(`I can't face to the land, because ${error}`)
-      //         return
-      //       })
-      //     }
-      //   }
-      // }
-      x++
-      if (x > fieldPosition.x + fieldPosition.width) {
-        x = fieldPosition.x
-        z++
-        if (z > fieldPosition.z + fieldPosition.length) {
-          break
         }
-        console.log(`Goto next position: ${x}, ${z}`)
       }
+      const nextPosition = nextFieldBlockPosition(x, z)
+      if (!nextPosition) {
+        break
+      }
+      x = nextPosition.x
+      z = nextPosition.z
+      console.log(`Goto next position: ${x}, ${z}`)
       await bot.pathfinder.goto(new GoalXZ(x, z)).then(() => {
         console.log(`I have arrived at ${bot.entity.position}`)
       }).catch((error) => {
@@ -780,6 +745,7 @@ function plowField() {
         return
       })
       await bot.waitForTicks(10)
+      
     }
     console.log('Finished plowing the entire field!');
     bot.chat('Finished plowing the entire field!')
@@ -787,31 +753,101 @@ function plowField() {
     return true;
     
   })
-    try {
-        
-    } catch (error) {
-        
-    }
 }
 
 // 播种
 function plant(seedName) {
-  // 首先去最近的chest中拿取与农田方格数相等的种子
-  getThingsFromContainer(seedName, fieldPosition.width * fieldPosition.length, 'chest')
-  bot.waitForTicks(10)
+  // 首先判断身上有没有农田方格数量的种子，如果没有，去最近的chest中拿取
+  const items = bot.inventory.items()
+  sayItems(items)
+  let seedCount = 0
+  items.forEach(item => {
+    if(item && item.type === bot.registry.itemsByName[seedName].id) {
+      seedCount += item.count
+    }
+  })
+  if (seedCount < fieldPosition.width * fieldPosition.length) {
+    console.log(`I don't have enough ${seedName}`)
+    getThingsFromContainer(seedName, fieldPosition.width * fieldPosition.length, 'chest')
+    bot.waitForTicks(10)
+  }
+
+  // 装备种子到hand上
+  const seedItem = items.find(item => {
+    return item && item.type === bot.registry.itemsByName[seedName].id
+  })
+  bot.equip(seedItem, 'hand').then(() => {
+    console.log(`I have equipped a ${seedName}`)
+  }).catch((error) => {
+    console.log(`I can't equip a ${seedName}, because ${error}`)
+    return
+  })
+
   // 去农田西北角
-  bot.pathfinder.goto(new GoalXZ(fieldPosition.x, fieldPosition.z)).then(async () => {
+  let x = fieldPosition.x
+  let z = fieldPosition.z
+  bot.pathfinder.goto(new GoalXZ(x, z)).then(async () => {
     console.log(`I have arrived at ${bot.entity.position}`)
-    await bot.waitForTicks(10)
+    // await bot.waitForTicks(10)
     // 遍历农田每一个块，进行播种操作
-    let x = fieldPosition.x
-    let z = fieldPosition.z
     while( true ) {
-      bot.lookAt(new )
+      // await bot.lookAt(new Vec3(x, fieldPosition.y - 1, z))
+      // await bot.waitForTicks(10)
+      const landBlock = await bot.blockAt(new Vec3(x, fieldPosition.y - 1, z))
+      console.log(`landBlock is ${landBlock.name} at ${landBlock.position}`)
+      const blockAbove = await bot.blockAt(new Vec3(x, fieldPosition.y, z))
+      console.log(`blockAbove is ${blockAbove.name} at ${blockAbove.position}`)
+      // 如果blockAbove不存在或者blockAbove是空气，那么播种
+      if (!blockAbove || blockAbove.type === 0) {
+        if (!bot.heldItem || bot.heldItem.type !== bot.registry.itemsByName[seedName].id) {
+          console.log(`I don't have a ${seedName}`)
+          //装备seedName到hand上
+          const theSeed = await bot.inventory.items().find(item => {
+            return item && item.type === bot.registry.itemsByName[seedName].id
+          })
+          if (!theSeed) {
+            console.error(`I can't find a ${seedName}`)
+            return
+          }
+          await bot.equip(theSeed, 'hand').then(() => {
+            console.log(`I have equipped a ${seedName}`)
+          }).catch((error) => {
+            console.error(`I can't equip a ${seedName}, because ${error}`)
+            return
+          })
+        }
+        await bot.placeBlock(landBlock, new Vec3(0, 1, 0)).then(async () => {
+        // await bot.activateBlock(bot.blockAt(bot.entity.position.offset(0, -1, 0))).then(async () => {
+          console.log(`I have planted a ${seedName}`)
+          await bot.waitForTicks(10)
+        }).catch((error) => {
+          console.log(`I can't plant a ${seedName}, because ${error}`)
+        })
+        // await bot.useOn(bot.blockAt(bot.entity.position.offset(0, -1, 0)))
+        // await bot.waitForTicks(10)
+        
+      }
+      const nextPosition = nextFieldBlockPosition(x, z)
+      if (!nextPosition) {
+        break
+      }
+      x = nextPosition.x
+      z = nextPosition.z
+      await bot.pathfinder.goto(new GoalXZ(x, z)).then(() => {
+        console.log(`I have arrived at ${bot.entity.position}`)
+      }).catch((error) => {
+        console.log(`I can't go to ${x}, ${z}, because ${error}`)
+        return
+      })
+      await bot.waitForTicks(5)
       
     }
+    console.log('Finished planting the entire field!');
+    bot.chat('Finished planting the entire field!')
+    stopTask()
+    return true;
     
-
+  })
 }
 
 // 从容器中拿取指定物品，并指定数量，数量默认是1，容器可以是canBeOpenItems中的任何一种
@@ -884,7 +920,7 @@ async function getThingsFromContainer(itemName, count = 1, containerName) {
   })
 }
 
-// 等待bot到达指定位置
+// 等待bot到达指定位置(废弃)
 async function waitForBotAtPosition(x, y, z, timeout = 60 * 20) {
   console.log(`Waiting for bot to go to x: ${x}, y: ${y}, z: ${z}, timeout: ${timeout / 20} seconds`)
   // 循环检查bot是否到达指定位置
@@ -907,6 +943,30 @@ async function waitForBotAtPosition(x, y, z, timeout = 60 * 20) {
       return
     }
   }
+}
+
+// 获取农田下一个方格的位置
+function nextFieldBlockPosition(x, z) {
+  let nextPosition = { x, z }
+  nextPosition.x++
+  // nextPosition.z++
+  if (nextPosition.x > fieldPosition.x + fieldPosition.width){
+    console.log(`I have arrived at the end of row x: ${nextPosition.x}, z: ${nextPosition.z}`)
+    if (nextPosition.z >= fieldPosition.z + fieldPosition.length) {
+      console.log(`I have arrived at the end of the field`)
+      return null
+    }
+    nextPosition.x = fieldPosition.x
+    nextPosition.z++
+  }
+  console.log(`The next position is x: ${nextPosition.x}, z: ${nextPosition.z}`)
+  // 判断下一个位置是否是water, 如果是water, 则跳过
+  const nextBlock = bot.blockAt(new Vec3(nextPosition.x, fieldPosition.y - 1, nextPosition.z))
+  if (nextBlock && nextBlock.type === bot.registry.blocksByName.water.id) {
+    console.log(`The next position is water, I can't go there. I will go to the next position`)
+    return nextFieldBlockPosition(nextPosition.x, nextPosition.z)
+  }
+  return nextPosition
 }
 
 
