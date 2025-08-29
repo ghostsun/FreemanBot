@@ -4,9 +4,58 @@ const { pathfinder, Movements } = require('mineflayer-pathfinder')
 const { GoalNear, GoalBlock, GoalXZ, GoalY, GoalInvert, GoalFollow, GoalBreakBlock } = require('mineflayer-pathfinder').goals
 const config = require('./utils/config')
 const { Vec3 } = require('vec3')
+const readline = require('readline')
+const CommandHandler = require('./commands/commandHandler')
+const { FIELDS, PLANT_AND_SEED, CAN_BE_OPEN_ITEMS, fieldPosition, fieldChestPosition, plantAndSeed } = require('./utils/constants');
+let commandHandler;
+
 
 // Load configuration
 config.load()
+
+// Set up command line interface
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+  prompt: 'bot> '
+});
+
+
+
+async function handleCommand(username, command, bot) {
+  if (username === 'console') {
+    console.log(`Executing command: ${command} from ${username}`);
+    if (command.startsWith('goto')){
+
+    }
+    commandHandler.handleCommand(username, command, bot);
+    return;
+  }
+
+  if (command === 'help') {
+    console.log('Available commands:');
+    console.log('  goto [x] <y> [z] [range] - Move to coordinates, range default to 1');
+    console.log('  looking <direction> - Look in a direction (north, south, east, west)');
+    console.log('  collect <block> - Collect the nearest block of type');
+    console.log('  help - Show this help');
+    console.log('  exit/quit - Exit the bot');
+  } else {
+    bot.emit('chat', username, command);
+  }
+}
+
+// Handle command line input
+rl.on('line', async (line) => {
+  const command = line.trim();
+  if (command) {
+    await handleCommand('console', command, bot);
+  }
+  rl.prompt();
+}).on('close', () => {
+  console.log('Goodbye!');
+  process.exit(0);
+});
+
 
 // Configuration
 const bossName = config.get('bossName') // Change this to your Minecraft username
@@ -18,26 +67,23 @@ let currentStep = 0
 // 可以被open的物品数组
 const canBeOpenItems = ['chest', 'barrel']
 
+// 农田map，key为农田名称，value为农田信息。保存多块农田
+const fieldsMap = FIELDS
+// const fieldsMap = {
+//   'field1': {
+//     position: { x: -6, y: 63, z: 167 },
+//     length: 18,    // z方向的长度
+//     width: 11,       // x方向的宽度
+//     plant: 'wheat'
+//   }
+// }
+
+
 // Fieldland 是一块方形农田，西北角坐标 + 长度 + 宽度
 // (-6, 63, 167) (5, 63, 185)
-const fieldPosition = {
-    x: -6,
-    y: 63,
-    z: 167,
-    length: 18,    // z方向的长度
-    width: 11       // x方向的宽度
-}
-
-const fieldChestPosition = {
-    x: -8,
-    y: 63,
-    z: 178
-}
-
-const plantAndSeed = [
-  { plant: 'wheat', seed: 'wheat_seeds' },
-  { plant: 'potato', seed: 'potato' },
-]
+// const fieldPosition = fieldsMap.fieldPosition;
+// const fieldChestPosition = fieldsMap.fieldChestPosition;
+// const plantAndSeed = PLANT_AND_SEED;
 
 // Debug logging helper
 function debugLog(message) {
@@ -59,23 +105,27 @@ const bot = mineflayer.createBot(options)
 console.log('FreemanBot has joined the server!')
 
 const welcome = () => {
-    bot.chat('Hi, I am ' + bot.username + ' and I am here to help you!')
-  }
+  bot.chat('Hi, I am ' + bot.username + ' and I am here to help you!')
+}
+// Display welcome message and prompt
+console.log('Bot console started. Type "help" for available commands.');
+rl.prompt();
   
 bot.once('spawn', welcome)
 
 bot.once('spawn', () => {
-    mineflayerViewer(bot, { firstPerson: true, port: 3000 }) // Start the viewing server on port 3000
-  
-    // Draw the path followed by the bot
-    const path = [bot.entity.position.clone()]
-    bot.on('move', () => {
-      if (path[path.length - 1].distanceTo(bot.entity.position) > 1) {
-        path.push(bot.entity.position.clone())
-        bot.viewer.drawLine('path', path)
-        debugLog('bot path update: ' + path[path.length - 1])
-      }
-    })
+  if (!commandHandler) commandHandler = new CommandHandler();
+  mineflayerViewer(bot, { firstPerson: true, port: 3000 }) // Start the viewing server on port 3000
+
+  // Draw the path followed by the bot
+  const path = [bot.entity.position.clone()]
+  bot.on('move', () => {
+    if (path[path.length - 1].distanceTo(bot.entity.position) > 1) {
+      path.push(bot.entity.position.clone())
+      bot.viewer.drawLine('path', path)
+      debugLog('bot path update: ' + path[path.length - 1])
+    }
+  })
 })
 
 bot.loadPlugin(pathfinder)
@@ -128,173 +178,17 @@ bot.once('spawn', () => {
       console.log("Command: " + command)
       // goto x y z
       if (command.startsWith('goto')) {
-        const cmd =command.split(' ')
-        if(cmd.length === 4) {
-          const x = parseInt(cmd[1])
-          const y = parseInt(cmd[2])
-          const z = parseInt(cmd[3]) 
-          moveTo(x, y, z, defaultMove)
-        // goto x z
-        } else if (cmd.length === 3) {
-          const x = parseInt(cmd[1])
-          const z = parseInt(cmd[2])    
-          moveTo(x, null, z, defaultMove)
-        // goto y
-        } else if (cmd.length === 2) {
-          const y = parseInt(cmd[1])
-          moveTo(null, y, null, defaultMove)
-        } else {
-          bot.chat("/tell " + username + " I don't understand you !")
-          return
-        }
-      } else if (command.startsWith('collect')) {
-        const cmd = command.split(' ')
-        if(cmd.length === 2) {
-          // Get the correct block type
-          const blockType = bot.registry.blocksByName[cmd[1]]
-          if (!blockType) {
-            bot.chat(`I don't know any blocks with name ${cmd[1]}.`)
-            return
-          }
-
-          bot.chat(`Collecting the nearest ${blockType.name}`)
-
-          // Try and find that block type in the world
-          const block = bot.findBlock({
-            matching: blockType.id,
-            maxDistance: 64
-          })
-
-          if (!block) {
-            bot.chat(`I don't see that block nearby.`)
-            return
-          }
-
-          // Collect the block if we found one
-          bot.collectBlock.collect(block, err => {
-            if (err) bot.chat(err.message)
-          })
-        } else {
-          bot.chat(`/tell ${username} What's mean ${message} ?`)
-          return
-        }
+        // 调用GotoCommand实现
+        commandHandler.handleCommand(username, command, bot);
       } else if (command.startsWith('looking')) {
-        const cmd = command.split(' ')
-        if(cmd.length === 2) {
-          const direction = cmd[1]
-          if(direction === 'north') {
-            // 第一个参数是90度的弧度，派的1/2
-            // 将角度转化为弧度 Math.PI / 180
-            bot.look(Math.PI / 2, 0)
-            return
-          } else if (direction === 'south') {
-            bot.look(Math.PI * 3 / 2, 0)
-            return
-          } else if (direction === 'east') {
-            bot.look(0, 0)
-            return
-          } else if (direction === 'west') {
-            bot.look(Math.PI, 0)
-            return
-          // } else if (direction == 'up') {
-          //   bot.look(0, 90)
-          // } else if (direction == 'down') {
-          //   bot.look(0, -90)
-          // 判断direction 是否为数字
-          } else if (!isNaN(parseFloat(direction)) && isFinite(direction)) {
-            bot.look(direction * Math.PI / 180, 0)
-            return
-          } else {
-            bot.chat(`/tell ${username} What's mean ${message} ?`)
-            return
-          }
-        } else if (cmd.length === 3) {
-          const yaw = cmd[1]
-          const pitch = cmd[2]
-          // 判断yaw 和 pitch 是否为数字
-          if(!isNaN(parseFloat(yaw)) && isFinite(yaw) && !isNaN(parseFloat(pitch)) && isFinite(pitch)) {
-            bot.look(yaw * Math.PI / 180, pitch * Math.PI / 180)
-          }
-          return
-        } else {
-          bot.chat(`/tell ${username} What's mean ${message} ?`)
-          return
-        }
+        // Route to LookingCommand via CommandHandler
+        commandHandler.handleCommand(username, command, bot);
       } else if (command.startsWith('find')) {
-        const cmd = command.split(' ')
-        if(cmd.length === 2) {
-          const blockType = bot.registry.blocksByName[cmd[1]]
-          if (!blockType) {
-            bot.chat(`I don't know any blocks with name ${cmd[1]}.`)
-            return
-          }
-
-          bot.chat(`Finding the nearest ${blockType.name}`)
-
-          // Try and find that block type in the world
-          const block = bot.findBlock({
-            matching: blockType.id,
-            maxDistance: 64
-          })
-
-          if (!block) {
-            bot.chat(`I don't see that block nearby.`)
-            return
-          }
-
-          console.log(`Found ${blockType.name} at ${block.position}`)
-          bot.chat(`Found ${blockType.name} at ${block.position}`)
-          return
-
-          // // Collect the block if we found one
-          // bot.collectBlock.collect(block, err => {
-          //   if (err) bot.chat(err.message)
-          // })
-        } else {
-          bot.chat(`/tell ${username} What's mean ${message} ?`)
-          return
-        }
+        // Route to FindCommand via CommandHandler
+        commandHandler.handleCommand(username, command, bot);
       } else if (command.startsWith('care')) {
-        const cmd = command.split(' ')
-        if(cmd.length === 2 && cmd[1] == 'wheat') {
-          if(!startTask(command)){
-            console.error(`I can't do ${command} because I am already doing a task: ${currentTask}`)
-            bot.chat(`${username} I can't do ${command} because I am already doing a task: ${currentTask}`)
-            return
-          }
-          console.log(`I will do ${command}`)
-          bot.chat(`I will do ${command}`)
-          harvestingWheat()
-          // 第一步，到箱子位置，拿取小麦种子和犁
-          // moveTo(fieldChestPosition.x, null, fieldChestPosition.z)
-          // bot.pathfinder.setMovements(defaultMove)
-          // bot.pathfinder.setGoal(new GoalXZ(fieldChestPosition.x, fieldChestPosition.z))
-          // bot.pathfinder.setGoal(new GoalXZ(fieldPosition.x, fieldPosition.z))
-          
-          // 收获小麦
-          
-
-          // 当bot到达农田西北角，goal_reached事件触发
-          
-          // 等待bot到达农田西北角向东一格
-          // waitForBotAtPosition(fieldPosition.x, fieldPosition.y, fieldPosition.z)
-          // console.log(`I have arrived at ${bot.entity.position}`)
-
-          // 开始收获小麦
-          // console.log('Starting to harvest the entire field!')
-          // bot.chat('Starting to harvest the entire field!')
-          // harvestingWheat()
-
-          // console.log('Finished harvesting the entire field!')
-          // bot.chat('Finished harvesting the entire field!')
-
-          // endTask(command)
-          return
-          // 打开附近的容器，例如箱子或桶
-        }else {
-          bot.chat(`/tell ${username} What's mean ${message} ?`)
-          return
-        }
+        // Route to CareCommand via CommandHandler
+        commandHandler.handleCommand(username, command, bot);
       } else if (command.startsWith('open')) {
           const cmd = command.split(' ')
           if(cmd.length === 2) {
@@ -969,5 +863,38 @@ function nextFieldBlockPosition(x, z) {
   return nextPosition
 }
 
-
-        
+// 移动到指定位置
+function goto(x, y, z, range) {
+  if (x !== null && y !== null && z !== null && range) {
+    bot.pathfinder.goto(new GoalXYZ(x, y, z, range)).then(() => {
+      console.log(`I have arrived at ${bot.entity.position}`)
+    }).catch((err) => {
+      console.log(`I can't go to ${x}, ${y}, ${z}, because ${err}`)
+    })
+    return
+  } else if (x !== null && y !== null && z !== null) {
+    bot.pathfinder.goto(new GoalXYZ(x, y, z)).then(() => {
+      console.log(`I have arrived at ${bot.entity.position}`)
+    }).catch((err) => {
+      console.log(`I can't go to ${x}, ${y}, ${z}, because ${err}`)
+    })
+    return
+  } else if (x !== null && z !== null) {
+    bot.pathfinder.goto(new GoalXZ(x, z)).then(() => {
+      console.log(`I have arrived at ${bot.entity.position}`)
+    }).catch((err) => {
+      console.log(`I can't go to ${x}, ${z}, because ${err}`)
+    })
+    return
+  } else if (y !== null) {
+    bot.pathfinder.goto(new GoalY(y)).then(() => {
+      console.log(`I have arrived at ${bot.entity.position}`)
+    }).catch((err) => {
+      console.log(`I can't go to ${y}, because ${err}`)
+    })
+    return
+  } else {
+    console.log(`I can't go to ${x}, ${y}, ${z}, because the parameters are invalid`)
+    return
+  }
+}

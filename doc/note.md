@@ -8,3 +8,22 @@
 
 农田用品，收获物品存放的箱子位置
 * -8, 63, 178
+
+## commands
+### goto
+#### test
+goto -5 63 185
+goto -5 63 167
+
+### looking
+#### test
+looking north
+looking east
+
+### find
+#### test
+
+
+### care
+#### test
+care field1
