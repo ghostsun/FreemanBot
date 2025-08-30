@@ -25,7 +25,7 @@ const rl = readline.createInterface({
 async function handleCommand(username, command, bot) {
   if (username === 'console') {
     console.log(`Executing command: ${command} from ${username}`);
-    if (command.startsWith('goto')){
+    if (command.startsWith('goto')) {
 
     }
     commandHandler.handleCommand(username, command, bot);
@@ -69,21 +69,7 @@ const canBeOpenItems = ['chest', 'barrel']
 
 // 农田map，key为农田名称，value为农田信息。保存多块农田
 const fieldsMap = FIELDS
-// const fieldsMap = {
-//   'field1': {
-//     position: { x: -6, y: 63, z: 167 },
-//     length: 18,    // z方向的长度
-//     width: 11,       // x方向的宽度
-//     plant: 'wheat'
-//   }
-// }
 
-
-// Fieldland 是一块方形农田，西北角坐标 + 长度 + 宽度
-// (-6, 63, 167) (5, 63, 185)
-// const fieldPosition = fieldsMap.fieldPosition;
-// const fieldChestPosition = fieldsMap.fieldChestPosition;
-// const plantAndSeed = PLANT_AND_SEED;
 
 // Debug logging helper
 function debugLog(message) {
@@ -110,7 +96,7 @@ const welcome = () => {
 // Display welcome message and prompt
 console.log('Bot console started. Type "help" for available commands.');
 rl.prompt();
-  
+
 bot.once('spawn', welcome)
 
 bot.once('spawn', () => {
@@ -131,335 +117,328 @@ bot.once('spawn', () => {
 bot.loadPlugin(pathfinder)
 
 bot.once('spawn', () => {
+  const defaultMove = new Movements(bot)
+  defaultMove.allowSprinting = false
+  defaultMove.allowParkour = false
+
+  bot.on('path_update', (r) => {
+    // console.log(`path update: ${r.path}`)
+    const nodesPerTick = (r.visitedNodes * 50 / r.time).toFixed(2)
+    // console.log(`I can get there in ${r.path.length} moves. Computation took ${r.time.toFixed(2)} ms (${r.visitedNodes} nodes, ${nodesPerTick} nodes/tick)`)
+  })
+
+  bot.on('goal_reached', () => {
+    console.log(`I have arrived at ${bot.entity.position}`)
+    // bot.chat(`I have arrived at ${bot.entity.position}`)
+  })
+
+  bot.on('path_reset', (reason) => {
+    console.log(`Path was reset for reason: ${reason}`)
+  })
+
+
+  bot.on('chat', (username, message) => {
+    debugLog(`Message from ${username}: ${message}`)
     const defaultMove = new Movements(bot)
     defaultMove.allowSprinting = false
     defaultMove.allowParkour = false
+    bot.pathfinder.setMovements(defaultMove)
+    const command = message
+    if (username == bot.username || username != bossName) return
+    if (config.get('runningLevel') != 'debug') {
+      command = message.slice(bot.username.length).trim()
+    }
 
-    bot.on('path_update', (r) => {
-        // console.log(`path update: ${r.path}`)
-        const nodesPerTick = (r.visitedNodes * 50 / r.time).toFixed(2)
-        // console.log(`I can get there in ${r.path.length} moves. Computation took ${r.time.toFixed(2)} ms (${r.visitedNodes} nodes, ${nodesPerTick} nodes/tick)`)
-    })
+    const target = bot.players[username] ? bot.players[username].entity : null
 
-    bot.on('goal_reached', () => {
-      console.log(`I have arrived at ${bot.entity.position}`)
-      // bot.chat(`I have arrived at ${bot.entity.position}`)
-    })
-
-    bot.on('path_reset', (reason) => {
-        console.log(`Path was reset for reason: ${reason}`)
-    })
-
-    // bot.pathfinder.setMovements(defaultMove)
-    // bot.pathfinder.setGoal(targetPosition)
-    // console.log('I am on my way to the target !')
-
-    // defaultMove.allowEntityDetection = true
-    // defaultMove.canDig = true
-    // defaultMove.allowSneak = true
-    // defaultMove.allowSprinting = true
-    // defaultMove.allowJump = true
-
-    bot.on('chat', (username, message) => {
-      debugLog(`Message from ${username}: ${message}`)
-      const defaultMove = new Movements(bot)
-      defaultMove.allowSprinting = false
-      defaultMove.allowParkour = false
-      bot.pathfinder.setMovements(defaultMove)
-      const command = message
-      if (username == bot.username || username != bossName) return
-      if (config.get('runningLevel') != 'debug') {
-        command = message.slice(bot.username.length).trim()
-      } 
-
-      const target = bot.players[username] ? bot.players[username].entity : null
-
-      console.log(`My boss ${bossName} is talking to me!`)
-      console.log("Command: " + command)
-      // goto x y z
-      if (command.startsWith('goto')) {
-        // 调用GotoCommand实现
-        commandHandler.handleCommand(username, command, bot);
-      } else if (command.startsWith('looking')) {
-        // Route to LookingCommand via CommandHandler
-        commandHandler.handleCommand(username, command, bot);
-      } else if (command.startsWith('find')) {
-        // Route to FindCommand via CommandHandler
-        commandHandler.handleCommand(username, command, bot);
-      } else if (command.startsWith('care')) {
-        // Route to CareCommand via CommandHandler
-        commandHandler.handleCommand(username, command, bot);
-      } else if (command.startsWith('open')) {
-          const cmd = command.split(' ')
-          if(cmd.length === 2) {
-            // 判断第二个参数是否在canBeOpenItems中
-            if (!canBeOpenItems.includes(cmd[1])) {
-              bot.chat(`I don't know any blocks with name ${cmd[1]}.`)
-              return
-            }
-            console.log(`I am going to open the nearest ${cmd[1]}`)
-            let openItemPosition = bot.findBlock({
-              matching: bot.registry.blocksByName[cmd[1]].id,
-              maxDistance: 64
-            })
-            if (!openItemPosition) {
-              bot.chat(`I don't see any ${cmd[1]} nearby.`)
-              return
-            }
-            console.log(`I have found the nearest ${cmd[1]}, my position is ${openItemPosition.position}`)
-            // bot.pathfinder.setMovements(defaultMove)
-            // bot.pathfinder.setGoal(new GoalNear(openItemPosition.position.x, openItemPosition.position.y, openItemPosition.position.z, RANGE_GOAL))
-            bot.pathfinder.goto(new GoalNear(openItemPosition.position.x, openItemPosition.position.y, openItemPosition.position.z, RANGE_GOAL)).then(() => {
-              console.log(`I have closed the nearest ${cmd[1]}, my position is ${bot.entity.position}`)
-              bot.waitForTicks(10)
-              console.log(`Opening the nearest ${cmd[1]}`)
-              bot.chat(`Opening the nearest ${cmd[1]}`)
-              bot.openContainer(openItemPosition).then((openItem) => {
-                items = openItem.containerItems()
-                sayItems(items)
-                openItem.close()
-                console.log(`I have closed the nearest ${cmd[1]}`)
-              }).catch((err) => {
-                console.error(err)
-                bot.chat(`I can't open the nearest ${cmd[1]}`)
-              })
-            }).catch((err) => {
-              console.error(err)
-              bot.chat(`I can't go to the nearest ${cmd[1]}`)
-            })
-            return
-          } else {
-            bot.chat(`/tell ${username} What's mean ${message} ?`)
-            return
-          }
-      } else if (command.startsWith('get')) {
-        const cmd = command.split(' ')
-        console.log(cmd)
-        if (cmd.length === 2) {
-          const item = cmd[1]
-          getThingsFromContainer(item, 1, 'chest')
-        } else if(cmd.length === 3) {
-          const item = cmd[1]
-          const count = parseInt(cmd[2])
-          // 判断count是否为数字
-          if(isNaN(count)) {
-            getThingsFromContainer(item, 1, cmd[2])
-          } else {
-            getThingsFromContainer(item, count, 'chest')
-          }
-        } else if(cmd.length === 4) {
-          const item = cmd[1]
-          const count = parseInt(cmd[2])
-          const container = cmd[3]
-          getThingsFromContainer(item, count, container)
-        } else {
-          bot.chat(`/tell ${username} What's mean ${message} ?`)
+    console.log(`My boss ${bossName} is talking to me!`)
+    console.log("Command: " + command)
+    // goto x y z
+    if (command.startsWith('goto')) {
+      // 调用GotoCommand实现
+      commandHandler.handleCommand(username, command, bot);
+    } else if (command.startsWith('looking')) {
+      // Route to LookingCommand via CommandHandler
+      commandHandler.handleCommand(username, command, bot);
+    } else if (command.startsWith('find')) {
+      // Route to FindCommand via CommandHandler
+      commandHandler.handleCommand(username, command, bot);
+    } else if (command.startsWith('care')) {
+      // Route to CareCommand via CommandHandler
+      commandHandler.handleCommand(username, command, bot);
+    } else if (command.startsWith('open')) {
+      const cmd = command.split(' ')
+      if (cmd.length === 2) {
+        // 判断第二个参数是否在canBeOpenItems中
+        if (!canBeOpenItems.includes(cmd[1])) {
+          bot.chat(`I don't know any blocks with name ${cmd[1]}.`)
+          return
         }
+        console.log(`I am going to open the nearest ${cmd[1]}`)
+        let openItemPosition = bot.findBlock({
+          matching: bot.registry.blocksByName[cmd[1]].id,
+          maxDistance: 64
+        })
+        if (!openItemPosition) {
+          bot.chat(`I don't see any ${cmd[1]} nearby.`)
+          return
+        }
+        console.log(`I have found the nearest ${cmd[1]}, my position is ${openItemPosition.position}`)
+        // bot.pathfinder.setMovements(defaultMove)
+        // bot.pathfinder.setGoal(new GoalNear(openItemPosition.position.x, openItemPosition.position.y, openItemPosition.position.z, RANGE_GOAL))
+        bot.pathfinder.goto(new GoalNear(openItemPosition.position.x, openItemPosition.position.y, openItemPosition.position.z, RANGE_GOAL)).then(() => {
+          console.log(`I have closed the nearest ${cmd[1]}, my position is ${bot.entity.position}`)
+          bot.waitForTicks(10)
+          console.log(`Opening the nearest ${cmd[1]}`)
+          bot.chat(`Opening the nearest ${cmd[1]}`)
+          bot.openContainer(openItemPosition).then((openItem) => {
+            items = openItem.containerItems()
+            sayItems(items)
+            openItem.close()
+            console.log(`I have closed the nearest ${cmd[1]}`)
+          }).catch((err) => {
+            console.error(err)
+            bot.chat(`I can't open the nearest ${cmd[1]}`)
+          })
+        }).catch((err) => {
+          console.error(err)
+          bot.chat(`I can't go to the nearest ${cmd[1]}`)
+        })
         return
-      } else if (command.startsWith('plant')) {
-        const cmd = command.split(' ')
-        if(cmd.length === 2) {
-          const seedName = cmd[1]
-          plant(seedName)
-        } else {
-          bot.chat(`/tell ${username} What's mean ${message} ?`)
-        }
+      } else {
+        bot.chat(`/tell ${username} What's mean ${message} ?`)
         return
       }
+    } else if (command.startsWith('get')) {
+      const cmd = command.split(' ')
+      console.log(cmd)
+      if (cmd.length === 2) {
+        const item = cmd[1]
+        getThingsFromContainer(item, 1, 'chest')
+      } else if (cmd.length === 3) {
+        const item = cmd[1]
+        const count = parseInt(cmd[2])
+        // 判断count是否为数字
+        if (isNaN(count)) {
+          getThingsFromContainer(item, 1, cmd[2])
+        } else {
+          getThingsFromContainer(item, count, 'chest')
+        }
+      } else if (cmd.length === 4) {
+        const item = cmd[1]
+        const count = parseInt(cmd[2])
+        const container = cmd[3]
+        getThingsFromContainer(item, count, container)
+      } else {
+        bot.chat(`/tell ${username} What's mean ${message} ?`)
+      }
+      return
+    } if (command.startsWith('put')){
+      commandHandler.handleCommand(username, command, bot)
+    } else if (command.startsWith('plant')) {
+      const cmd = command.split(' ')
+      if (cmd.length === 2) {
+        const seedName = cmd[1]
+        plant(seedName)
+      } else {
+        bot.chat(`/tell ${username} What's mean ${message} ?`)
+      }
+      return
+    }
 
-      switch (command) {
-        case 'come':
-          if (!target) {
-            bot.chat(" I don't see you !")
+    switch (command) {
+      case 'come':
+        if (!target) {
+          bot.chat(" I don't see you !")
+          return
+        }
+
+        const p = target.position
+
+        bot.pathfinder.setMovements(defaultMove)
+        bot.pathfinder.setGoal(new GoalNear(p.x, p.y, p.z, RANGE_GOAL))
+        console.log("Starting to go to your position !")
+        break
+      case 'stop':
+        bot.pathfinder.stop()
+        bot.clearControlStates()
+        console.log("Stopping !")
+        break
+      case 'go home':
+        bot.quit()
+        console.log("Goodbye !")
+        process.exit(0)
+      case 'forward':
+      case 'w':
+      case 'W':
+        bot.setControlState('forward', true)
+        bot.setControlState('forward', false)
+        break
+      case 'back':
+      case 's':
+      case 'S':
+        bot.setControlState('back', true)
+        bot.setControlState('back', false)
+        break
+      case 'left':
+      case 'a':
+      case 'A':
+        bot.setControlState('left', true)
+        bot.setControlState('left', false)
+        break
+      case 'right':
+      case 'd':
+      case 'D':
+        bot.setControlState('right', true)
+        bot.setControlState('right', false)
+        break
+      case 'stop controls':
+        bot.clearControlStates()
+        break
+      case 'jump':
+      case ' ':
+        bot.setControlState('jump', true)
+        bot.setControlState('jump', false)
+        break
+      case 'attack':
+        entity = bot.nearestEntity()
+        if (entity) {
+          bot.attack(entity, true)
+        } else {
+          bot.chat('no nearby entities')
+        }
+        break
+      case 'lookme':
+        bot.lookAt(target.position.offset(0, target.height, 0))
+        break
+      case 'mount':
+        entity = bot.nearestEntity((entity) => { return entity.name === 'minecart' })
+        if (entity) {
+          bot.mount(entity)
+        } else {
+          bot.chat('no nearby objects')
+        }
+        break
+      case 'dismount':
+        bot.dismount()
+        break
+      case 'move vehicle forward':
+        bot.moveVehicle(0.0, 1.0)
+        break
+      case 'move vehicle backward':
+        bot.moveVehicle(0.0, -1.0)
+        break
+      case 'move vehicle left':
+        bot.moveVehicle(1.0, 0.0)
+        break
+      case 'move vehicle right':
+        bot.moveVehicle(-1.0, 0.0)
+        break
+      case 'tp':
+        bot.entity.position.y += 10
+        break
+      case 'pos':
+        bot.chat(bot.entity.position.toString())
+        break
+      case 'yp':
+        bot.chat(`Yaw ${bot.entity.yaw}, pitch: ${bot.entity.pitch}`)
+        break
+      case 'stopTask':
+        stopTask()
+        break
+      case 'getTask':
+        bot.chat(getTask())
+        break
+      case 'sayItems':
+        items = bot.inventory.items()
+        sayItems(items)
+        break
+      case 'watchChest':
+        bot.pathfinder.goto(new GoalNear(fieldChestPosition.x, fieldChestPosition.y, fieldChestPosition.z, RANGE_GOAL)).then(async () => {
+          console.log(`I have arrived at ${bot.entity.position}`)
+          let chestToOpen = bot.findBlock({
+            matching: bot.registry.blocksByName['chest'].id,
+            maxDistance: 6
+          })
+          if (!chestToOpen) {
+            console.log(`I can't find the chest`)
+            bot.chat(`I can't find the chest`)
             return
           }
+          console.log(`Opening chest at ${chestToOpen.position}`)
+          bot.chat(`Opening chest at ${chestToOpen.position}`)
+          const chest = await bot.openContainer(chestToOpen)
 
-          const p = target.position
-
-          bot.pathfinder.setMovements(defaultMove)
-          bot.pathfinder.setGoal(new GoalNear(p.x, p.y, p.z, RANGE_GOAL))
-          console.log("Starting to go to your position !")
-          break
-        case 'stop':
-          bot.pathfinder.stop()
-          bot.clearControlStates()
-          console.log("Stopping !")
-          break
-        case 'go home':
-          bot.quit()
-          console.log("Goodbye !")
-          process.exit(0)
-        case 'forward':
-        case 'w':
-        case 'W':
-          bot.setControlState('forward', true)
-          bot.setControlState('forward', false)
-          break
-        case 'back':
-        case 's':
-        case 'S':
-          bot.setControlState('back', true)
-          bot.setControlState('back', false)
-          break
-        case 'left':
-        case 'a':
-        case 'A':
-          bot.setControlState('left', true)
-          bot.setControlState('left', false)
-          break
-        case 'right':
-        case 'd':
-        case 'D':
-          bot.setControlState('right', true)
-          bot.setControlState('right', false)
-          break
-        case 'stop controls':
-          bot.clearControlStates()
-          break
-        case 'jump':
-        case ' ':
-          bot.setControlState('jump', true)
-          bot.setControlState('jump', false)
-          break
-        case 'attack':
-          entity = bot.nearestEntity()
-          if (entity) {
-            bot.attack(entity, true)
-          } else {
-            bot.chat('no nearby entities')
-          }
-          break
-        case 'lookme':
-          bot.lookAt(target.position.offset(0, target.height, 0))
-          break
-        case 'mount':
-          entity = bot.nearestEntity((entity) => { return entity.name === 'minecart' })
-          if (entity) {
-            bot.mount(entity)
-          } else {
-            bot.chat('no nearby objects')
-          }
-          break
-        case 'dismount':
-          bot.dismount()
-          break
-        case 'move vehicle forward':
-          bot.moveVehicle(0.0, 1.0)
-          break
-        case 'move vehicle backward':
-          bot.moveVehicle(0.0, -1.0)
-          break
-        case 'move vehicle left':
-          bot.moveVehicle(1.0, 0.0)
-          break
-        case 'move vehicle right':
-          bot.moveVehicle(-1.0, 0.0)
-          break
-        case 'tp':
-          bot.entity.position.y += 10
-          break
-        case 'pos':
-          bot.chat(bot.entity.position.toString())
-          break
-        case 'yp':
-          bot.chat(`Yaw ${bot.entity.yaw}, pitch: ${bot.entity.pitch}`)
-          break
-        case 'stopTask':
-          stopTask()
-          break
-        case 'getTask':
-          bot.chat(getTask())
-          break
-        case 'sayItems':
-          items = bot.inventory.items()
+          items = chest.containerItems()
           sayItems(items)
-          break
-        case 'watchChest':
-          bot.pathfinder.goto(new GoalNear(fieldChestPosition.x, fieldChestPosition.y, fieldChestPosition.z, RANGE_GOAL)).then(async () => {
-            console.log(`I have arrived at ${bot.entity.position}`)
-            let chestToOpen = bot.findBlock({
-              matching: bot.registry.blocksByName['chest'].id,
-              maxDistance: 6
-            })
-            if (!chestToOpen) {
-              console.log(`I can't find the chest`)
-              bot.chat(`I can't find the chest`)
-              return
-            }
-            console.log(`Opening chest at ${chestToOpen.position}`)
-            bot.chat(`Opening chest at ${chestToOpen.position}`)
-            const chest = await bot.openContainer(chestToOpen)
-            
-            items = chest.containerItems()
-            sayItems(items)
 
-            chest.on('updateSlot', (slot, oldItem, newItem) => {
-              console.log(`Slot ${slot} updated: ${oldItem} -> ${newItem}`)
-            })
-            chest.on('close', () => {
-              console.log('Chest closed')
-            })
-            chest.on('open', () => {
-              console.log('Chest opened')
-            })
+          chest.on('updateSlot', (slot, oldItem, newItem) => {
+            console.log(`Slot ${slot} updated: ${oldItem} -> ${newItem}`)
           })
-          break
-        case 'plow':
-          plowField()
-          break
-        default:
+          chest.on('close', () => {
+            console.log('Chest closed')
+          })
+          chest.on('open', () => {
+            console.log('Chest opened')
+          })
+        })
+        break
+      case 'plow':
+        plowField()
+        break
+      default:
         bot.chat('I don\'t understand you !')
         break
-      }
-      // bot.once('spawn', () => {
-      //   // keep your eyes on the target, so creepy!
-      //   setInterval(watchTarget, 50)
-      
-      //   function watchTarget () {
-      //     if (!target) return
-      //     bot.lookAt(target.position.offset(0, target.height, 0))
-      //   }
-      // })
+    }
+    // bot.once('spawn', () => {
+    //   // keep your eyes on the target, so creepy!
+    //   setInterval(watchTarget, 50)
 
-      // const { x: playerX, y: playerY, z: playerZ } = target.position
-      // console.log("Player position: " + playerX + ", " + playerY + ", " + playerZ)
+    //   function watchTarget () {
+    //     if (!target) return
+    //     bot.lookAt(target.position.offset(0, target.height, 0))
+    //   }
+    // })
 
-      // bot.pathfinder.setMovements(defaultMove)
-      // bot.pathfinder.setGoal(new GoalNear(playerX, playerY, playerZ, RANGE_GOAL))
-      // console.log("Starting to follow you !")
-    })
+    // const { x: playerX, y: playerY, z: playerZ } = target.position
+    // console.log("Player position: " + playerX + ", " + playerY + ", " + playerZ)
+
+    // bot.pathfinder.setMovements(defaultMove)
+    // bot.pathfinder.setGoal(new GoalNear(playerX, playerY, playerZ, RANGE_GOAL))
+    // console.log("Starting to follow you !")
+  })
 })
 
 function startTask(task, step = 0) {
-    if (currentTask || currentStep !== step) {
-        bot.chat(`I am already doing a task: ${currentTask}, step: ${currentStep}`)
-        return false
-    }
-    currentTask = task
-    currentStep = step
-    return true
+  if (currentTask || currentStep !== step) {
+    bot.chat(`I am already doing a task: ${currentTask}, step: ${currentStep}`)
+    return false
+  }
+  currentTask = task
+  currentStep = step
+  return true
 }
 
 function stopTask() {
-    currentTask = null
-    currentStep = 0
-    bot.pathfinder.stop()
-    bot.clearControlStates()
-    return true
+  currentTask = null
+  currentStep = 0
+  bot.pathfinder.stop()
+  bot.clearControlStates()
+  return true
 }
 
 function getTask() {
-    return currentTask
+  return currentTask
 }
 
 function endTask(task) {
-    currentTask = null
-    currentStep = 0
-    return true
+  currentTask = null
+  currentStep = 0
+  return true
 }
 
 // 将物品转换为字符串
-function itemToString (item) {
+function itemToString(item) {
   if (item) {
     return `${item.name} x ${item.count}`
   } else {
@@ -467,7 +446,7 @@ function itemToString (item) {
   }
 }
 
-function itemByName (items, name) {
+function itemByName(items, name) {
   let item
   let i
   for (i = 0; i < items.length; ++i) {
@@ -478,61 +457,61 @@ function itemByName (items, name) {
 }
 
 function sayItems(items) {
-    const output = items.map(itemToString).join(`, `)
-    if(output) {
-      console.log(output)
-      bot.chat(output)
-    } else {
-      console.log('No items found')
-      bot.chat('No items found')
-    }
+  const output = items.map(itemToString).join(`, `)
+  if (output) {
+    console.log(output)
+    bot.chat(output)
+  } else {
+    console.log('No items found')
+    bot.chat('No items found')
+  }
 }
 
 // 收获小麦
 async function harvestingWheat() {
-    try {
-        // 先移动到农田西北角
-        const defaultMove = new Movements(bot)
-        defaultMove.allowSprinting = false
-        defaultMove.allowParkour = false
-        bot.pathfinder.setMovements(defaultMove)
+  try {
+    // 先移动到农田西北角
+    const defaultMove = new Movements(bot)
+    defaultMove.allowSprinting = false
+    defaultMove.allowParkour = false
+    bot.pathfinder.setMovements(defaultMove)
 
-        // 循环从农田西北角开始遍历农田每一格，并收获每一格上的小麦
-        let x = fieldPosition.x
-        let z = fieldPosition.z
-        while( true ) {
-          await bot.pathfinder.goto(new GoalXZ(x, z)).then(() => {
-            console.log(`I have arrived at ${bot.entity.position}`)
-            const wheat = bot.findBlock({
-              maxDistance: 1,
-              matching: (block) => {
-                return block && block.type === bot.registry.blocksByName.wheat.id && block.metadata === 7
-              }
-            })
-            if (wheat) {
-              console.log(`Harvesting wheat at ${wheat.position}`)
-              bot.dig(wheat).then(() => {
-                console.log(`I have harvested wheat at ${bot.entity.position}`)
-              })
-            }
-          })
-          const nextPosition = nextFieldBlockPosition(x, z)
-          if (!nextPosition) {
-            break
+    // 循环从农田西北角开始遍历农田每一格，并收获每一格上的小麦
+    let x = fieldPosition.x
+    let z = fieldPosition.z
+    while (true) {
+      await bot.pathfinder.goto(new GoalXZ(x, z)).then(() => {
+        console.log(`I have arrived at ${bot.entity.position}`)
+        const wheat = bot.findBlock({
+          maxDistance: 1,
+          matching: (block) => {
+            return block && block.type === bot.registry.blocksByName.wheat.id && block.metadata === 7
           }
-          x = nextPosition.x
-          z = nextPosition.z
-          await bot.waitForTicks(10)
+        })
+        if (wheat) {
+          console.log(`Harvesting wheat at ${wheat.position}`)
+          bot.dig(wheat).then(() => {
+            console.log(`I have harvested wheat at ${bot.entity.position}`)
+          })
         }
-        console.log('Finished harvesting the entire field!');
-        bot.chat('Finished harvesting the entire field!')
-        stopTask()
-        return true;
-    } catch (error) {
-        console.error('Error during harvesting:', error);
-        stopTask()
-        return false;
+      })
+      const nextPosition = nextFieldBlockPosition(x, z)
+      if (!nextPosition) {
+        break
+      }
+      x = nextPosition.x
+      z = nextPosition.z
+      await bot.waitForTicks(10)
     }
+    console.log('Finished harvesting the entire field!');
+    bot.chat('Finished harvesting the entire field!')
+    stopTask()
+    return true;
+  } catch (error) {
+    console.error('Error during harvesting:', error);
+    stopTask()
+    return false;
+  }
 }
 
 // 犁地
@@ -541,9 +520,9 @@ function plowField() {
   const items = bot.inventory.items()
   sayItems(items)
   const hoe = items.find(item => {
-    return item && (item.type === bot.registry.itemsByName['stone_hoe'].id 
-      || item.type === bot.registry.itemsByName['wooden_hoe'].id 
-      || item.type === bot.registry.itemsByName['iron_hoe'].id 
+    return item && (item.type === bot.registry.itemsByName['stone_hoe'].id
+      || item.type === bot.registry.itemsByName['wooden_hoe'].id
+      || item.type === bot.registry.itemsByName['iron_hoe'].id
       || item.type === bot.registry.itemsByName['diamond_hoe'].id
       || item.type === bot.registry.itemsByName['golden_hoe'].id)
   })
@@ -571,12 +550,12 @@ function plowField() {
     // 逐格检查农田每一格土地是否是farmland,如果不是farmland,则犁地
     let x = fieldPosition.x
     let z = fieldPosition.z
-    while( true ) {
+    while (true) {
       let landBlockPositions = bot.findBlocks({
         maxDistance: 1,
         matching: (block) => {
-          return block && (block.type === bot.registry.blocksByName.grass_block.id 
-            || block.type === bot.registry.blocksByName.granite.id 
+          return block && (block.type === bot.registry.blocksByName.grass_block.id
+            || block.type === bot.registry.blocksByName.granite.id
             || block.type === bot.registry.blocksByName.dirt.id
             || block.type === bot.registry.blocksByName.dirt_path.id
             || block.type === bot.registry.blocksByName.rooted_dirt.id)
@@ -592,17 +571,17 @@ function plowField() {
           let landBlockPosition = landBlockPositions[i]
           console.log(`Before filter land block ${bot.blockAt(landBlockPosition).name} at ${landBlockPosition}`)
         }
-        
+
         // 剔除坐标向下取整后，landBlocks Y轴坐标不相同的 和 距离不在一格范围内的 block, 并且block的位置不在farmland范围内
         landBlockPositions = landBlockPositions.filter(block => block.y === (fieldPosition.y - 1)
           && (block.x === Math.floor(bot.entity.position.x) && block.z === Math.floor(bot.entity.position.z)))
-        
+
         // 遍历输出landBlocks的坐标
         for (let i = 0; i < landBlockPositions.length; i++) {
           let landBlockPosition = landBlockPositions[i]
           console.log(`After filter land block ${bot.blockAt(landBlockPosition).name} at ${landBlockPosition}`)
         }
-        
+
         // 遍历landBlocks， 对每一格块进行犁地操作
         for (let i = 0; i < landBlockPositions.length; i++) {
           await bot.lookAt(landBlockPositions[i]).then(async () => {
@@ -639,13 +618,13 @@ function plowField() {
         return
       })
       await bot.waitForTicks(10)
-      
+
     }
     console.log('Finished plowing the entire field!');
     bot.chat('Finished plowing the entire field!')
     stopTask()
     return true;
-    
+
   })
 }
 
@@ -656,7 +635,7 @@ function plant(seedName) {
   sayItems(items)
   let seedCount = 0
   items.forEach(item => {
-    if(item && item.type === bot.registry.itemsByName[seedName].id) {
+    if (item && item.type === bot.registry.itemsByName[seedName].id) {
       seedCount += item.count
     }
   })
@@ -684,7 +663,7 @@ function plant(seedName) {
     console.log(`I have arrived at ${bot.entity.position}`)
     // await bot.waitForTicks(10)
     // 遍历农田每一个块，进行播种操作
-    while( true ) {
+    while (true) {
       // await bot.lookAt(new Vec3(x, fieldPosition.y - 1, z))
       // await bot.waitForTicks(10)
       const landBlock = await bot.blockAt(new Vec3(x, fieldPosition.y - 1, z))
@@ -711,7 +690,7 @@ function plant(seedName) {
           })
         }
         await bot.placeBlock(landBlock, new Vec3(0, 1, 0)).then(async () => {
-        // await bot.activateBlock(bot.blockAt(bot.entity.position.offset(0, -1, 0))).then(async () => {
+          // await bot.activateBlock(bot.blockAt(bot.entity.position.offset(0, -1, 0))).then(async () => {
           console.log(`I have planted a ${seedName}`)
           await bot.waitForTicks(10)
         }).catch((error) => {
@@ -719,7 +698,7 @@ function plant(seedName) {
         })
         // await bot.useOn(bot.blockAt(bot.entity.position.offset(0, -1, 0)))
         // await bot.waitForTicks(10)
-        
+
       }
       const nextPosition = nextFieldBlockPosition(x, z)
       if (!nextPosition) {
@@ -734,13 +713,13 @@ function plant(seedName) {
         return
       })
       await bot.waitForTicks(5)
-      
+
     }
     console.log('Finished planting the entire field!');
     bot.chat('Finished planting the entire field!')
     stopTask()
     return true;
-    
+
   })
 }
 
@@ -844,7 +823,7 @@ function nextFieldBlockPosition(x, z) {
   let nextPosition = { x, z }
   nextPosition.x++
   // nextPosition.z++
-  if (nextPosition.x > fieldPosition.x + fieldPosition.width){
+  if (nextPosition.x > fieldPosition.x + fieldPosition.width) {
     console.log(`I have arrived at the end of row x: ${nextPosition.x}, z: ${nextPosition.z}`)
     if (nextPosition.z >= fieldPosition.z + fieldPosition.length) {
       console.log(`I have arrived at the end of the field`)

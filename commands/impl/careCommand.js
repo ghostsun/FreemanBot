@@ -7,7 +7,7 @@ class CareCommand extends Command {
     super(
       'care',
       'Care for a specific crop (e.g. wheat)',
-      'care <cropType>'
+      'care <fieldName>'
     );
 	
 	this.careService = new CareService();

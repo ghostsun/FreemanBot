@@ -27,3 +27,17 @@ looking east
 ### care
 #### test
 care field1
+
+
+### put
+#### test
+put 64 wheat fieldChest
+put 64 wheat -8 63 178
+
+
+### inventory
+#### test
+inventory items
+inventory find wood 10
+inventory equip wood
+inventory unequip

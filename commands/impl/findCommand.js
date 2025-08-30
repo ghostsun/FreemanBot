@@ -14,24 +14,31 @@ class FindCommand extends Command {
       console.error('Invalid number of arguments');
       return;
     }
-    const blockType = bot.registry.blocksByName[args[0]];
+    const blockType = args[0]
     if (!blockType) {
-      console.error(`Unknown block type: ${args[0]}`);
+      console.error('No block type specified');
+      return;
+    }
+
+    const blockTypeObj = bot.registry.blocksByName[blockType];
+    if (!blockTypeObj) {
+      console.error(`I don't know any blocks named ${blockType}.`);
       return;
     }
 
     // Try and find that block type in the world
-    const block = bot.findBlock({
-      matching: blockType.id,
+    const block = await bot.findBlock({
+      matching: blockTypeObj.id,
       maxDistance: 64
     });
 
     if (!block) {
-      console.error(`No blocks of type ${blockType.name} found nearby`);
+      console.error(`No blocks of type ${blockType} found nearby`);
       return;
     }
 
-    console.log(`Found ${blockType.name} at ${block.position}`);
+    console.log(`Found ${blockTypeObj.name} at x: ${block.position.x}, y: ${block.position.y}, z: ${block.position.z}`);
+    return block
   }
 }
 

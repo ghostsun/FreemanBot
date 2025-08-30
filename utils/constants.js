@@ -3,6 +3,8 @@
  * 可在各处 import/require 使用
  */
 
+const RANGE_GOAL = 1;
+
 const FIELDS = {
   'field1': {
     name: 'field1',
@@ -24,10 +26,26 @@ const fieldPosition = FIELDS['field1'].position;
 const fieldChestPosition = FIELDS['field1'].chest;
 const plantAndSeed = PLANT_AND_SEED;
 
+const CONTAINERS = new Map([
+  ['fieldChest', {
+    name: 'fieldChest',
+    position: { x: -9, y: 63, z: 178 },
+    type: 'chest'
+  }]
+]);
+
+const CONTAINER_TYPES = [
+  'chest',
+  'barrel'
+];
+
 module.exports = {
   FIELDS,
   PLANT_AND_SEED,
   CAN_BE_OPEN_ITEMS,
+  CONTAINERS,
+  CONTAINER_TYPES,
+  RANGE_GOAL,
   // 兼容 main.js
   fieldPosition,
   fieldChestPosition,

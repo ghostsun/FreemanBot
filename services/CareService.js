@@ -14,13 +14,82 @@ class CareService {
 	 */
 	async harvest(bot, field) {
 		try {
-			// 先移动到农田西北角
 			const fieldPosition = field.position;
 			let x = fieldPosition.x;
 			let y = fieldPosition.y - 1;
 			let z = fieldPosition.z;
 			let direction = 1; // 1表示向东，-1表示向西
+			const chestPosition = field.chestPosition;
+			const seedName = PLANT_AND_SEED.find(ps => ps.plant === field.plant)?.seed;
+			if (!seedName) {
+				console.error(`No seed type found for crop ${field.plant}, can't plant or harvest`);
+			}
 
+			// 检查bot身上是否有hoe和seed，如果没有则到chest里取一把hoe和农田块数量的seed
+			const hoeItem = bot.inventory.items().find((item) => item.name.endsWith('_hoe'));
+			if (!hoeItem) {
+				console.log('No hoe found in inventory, need to get one from chest');
+				await bot.pathfinder.goto(new GoalNear(chestPosition.x, chestPosition.y, chestPosition.z, 1)).then(async () => {
+					const chestBlock = bot.findBlock({
+						matching: (block) => {
+							return block && block.type === bot.registry.blocksByName.chest.id;
+						},
+						maxDistance: 2
+					});
+					if (chestBlock) {
+						bot.openContainer(chestBlock).then(async (chest) => {
+							const chestHoe = chest.items().find((item) => item.name.endsWith('_hoe'));
+							if (chestHoe) {
+								await chest.withdraw(chestHoe.type, null, 1).then(() => {
+									console.log(`I have taken a ${chestHoe.name} from the chest`);
+								}).catch((error) => {
+									console.error(`I can't take a ${chestHoe.name} from the chest, because ${error}`);
+								});
+							} else {
+								console.error('No hoe found in chest');
+							}
+							// 取种子
+							// 检查身上是否带有足够的种子，遍历身上物品将seedName的数量加起来
+							if (seedName) {
+								const seedCountInInventory = bot.inventory.items().filter((item) => item.name === seedName).reduce((acc, item) => acc + item.count, 0);
+								const fieldBlockCount = fieldPosition.width * fieldPosition.length;
+								if (seedCountInInventory < fieldBlockCount) {
+									const seedNeeded = fieldBlockCount - seedCountInInventory;
+									// 遍历chest物品，找到seedName的物品便取出，直到取够seedNeeded数量或者遍历完chest中的物品
+									let seedTaken = 0;
+									for (const item of chest.items()) {
+										if (item.name === seedName) {
+											const takeCount = Math.min(item.count, seedNeeded - seedTaken);
+											await chest.withdraw(item.type, null, takeCount).then(() => {
+												seedTaken += takeCount;
+												console.log(`I have taken ${takeCount} ${seedName} from the chest`);
+											}).catch((error) => {
+												console.error(`I can't take ${takeCount} ${seedName} from the chest, because ${error}`);
+											});
+											if (seedTaken >= seedNeeded) {
+												break;
+											}
+										}
+									}
+								} else {
+									console.log(`I have enough ${seedName} in my inventory`);
+								}
+							}
+							await chest.close();
+						}).catch((error) => {
+							console.error(`I can't open the chest, because ${error}`);
+						});
+					} else {
+						console.error('No chest found near the chest position');
+					}
+				}).catch((err) => {
+					console.error(`Failed to reach chest at ${chestPosition.x}, ${chestPosition.y}, ${chestPosition.z}: ${err.message}`);
+					return;
+				});
+			}
+
+			// 开始收获和种植
+			// 遍历农田的每一个方格，收获并种植
 			while (true) {
 				await bot.pathfinder.goto(new GoalXZ(x, z)).then(async () => {
 					console.log(`I have arrived at ${bot.entity.position}`);
@@ -79,7 +148,6 @@ class CareService {
 						const blockAbove = await bot.blockAt(new Vec3(x, fieldPosition.y, z))
 						// 如果blockAbove不存在或者blockAbove是空气，那么播种
 						if (!blockAbove || blockAbove.type === 0) {
-							const seedName = PLANT_AND_SEED.find(ps => ps.plant === field.plant)?.seed;
 							if (seedName) {
 								if (!bot.heldItem || bot.heldItem.type !== bot.registry.itemsByName[seedName].id) {
 									console.log(`I don't have a ${seedName}`)
