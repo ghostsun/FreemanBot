@@ -6,7 +6,7 @@
 const { GoalNear, GoalBlock, GoalXZ, GoalY, GoalInvert, GoalFollow, GoalBreakBlock } = require('mineflayer-pathfinder').goals
 const { FIELDS, PLANT_AND_SEED, CAN_BE_OPEN_ITEMS } = require('../utils/constants');
 const { Vec3 } = require('vec3')
-const DepositService = require('./DepositService');
+const DepositService = require('./depositService');
 class CareService {
 	depositService = new DepositService();
 	/**

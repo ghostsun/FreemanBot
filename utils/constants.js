@@ -15,6 +15,18 @@ const FIELDS = {
   }
 };
 
+const CHESTS = {
+  'fieldChest': { x: -9, y: 63, z: 178 },
+  'woodChest': { x: -9, y: 63, z: 173 }
+}
+
+const TOOLS = {
+  'wood': '_axe',
+  '_log': '_axe',
+  'dirt': '_shovel',
+  'grass_block': '_shovel'
+}
+
 const PLANT_AND_SEED = [
   { plant: 'wheat', seed: 'wheat_seeds' },
   { plant: 'potato', seed: 'potato' }
@@ -32,13 +44,15 @@ const CONTAINERS = new Map([
     name: 'fieldChest',
     position: { x: -9, y: 63, z: 178 },
     type: 'chest'
+  }],
+  ['woodChest', {
+    name: 'woodChest',
+    position: { x: -9, y: 63, z: 173 },
+    type: 'chest'
   }]
 ]);
 
-const CONTAINER_TYPES = [
-  'chest',
-  'barrel'
-];
+const CONTAINER_TYPES = CAN_BE_OPEN_ITEMS;
 
 module.exports = {
   FIELDS,
@@ -51,5 +65,6 @@ module.exports = {
   // 兼容 main.js
   fieldPosition,
   fieldChestPosition,
-  plantAndSeed
+  plantAndSeed,
+  TOOLS
 };

@@ -16,7 +16,7 @@ class DepositCommand extends Command {
 
   async execute(args, username, bot) {
     try {
-      console.log(args);
+      // console.log(args);
       let itemName;
       let itemCount = 1;
       let containerName;
@@ -48,11 +48,6 @@ class DepositCommand extends Command {
           bot.chat('Please specify a valid number for count, item name, and container name');
           return
         }
-      }
-
-      if (!itemName) {
-        bot.chat('Please specify the item name to deposit');
-        return this.sendUsage(bot);
       }
 
       if (!containerPos) {

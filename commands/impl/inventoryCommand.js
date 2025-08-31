@@ -1,5 +1,5 @@
 const Command = require('../baseCommand');
-const InventoryService = require('../../services/InventoryService');
+const InventoryService = require('../../services/inventoryService');
 
 class InventoryCommand extends Command {
   constructor() {

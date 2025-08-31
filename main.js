@@ -1,6 +1,7 @@
 const mineflayer = require('mineflayer')
 const mineflayerViewer = require('prismarine-viewer').mineflayer
 const { pathfinder, Movements } = require('mineflayer-pathfinder')
+const collectBlock = require('mineflayer-collectblock').plugin
 const { GoalNear, GoalBlock, GoalXZ, GoalY, GoalInvert, GoalFollow, GoalBreakBlock } = require('mineflayer-pathfinder').goals
 const config = require('./utils/config')
 const { Vec3 } = require('vec3')
@@ -115,6 +116,7 @@ bot.once('spawn', () => {
 })
 
 bot.loadPlugin(pathfinder)
+bot.loadPlugin(collectBlock)
 
 bot.once('spawn', () => {
   const defaultMove = new Movements(bot)
@@ -244,6 +246,8 @@ bot.once('spawn', () => {
         bot.chat(`/tell ${username} What's mean ${message} ?`)
       }
       return
+    } else if (command.startsWith('dig')) {
+      commandHandler.handleCommand(username, command, bot)
     }
 
     switch (command) {

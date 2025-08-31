@@ -23,7 +23,8 @@ class CommandHandler extends EventEmitter {
       'quit': require('./impl/quitCommand'),
       'exit': require('./impl/quitCommand'),
       'inventory': require('./impl/inventoryCommand'),
-      'inv': require('./impl/inventoryCommand')
+      'inv': require('./impl/inventoryCommand'),
+      'dig': require('./impl/digCommand')
     };
     for (const [name, CommandClass] of Object.entries(CommandModules)) {
       this.registerCommand(name, new CommandClass());

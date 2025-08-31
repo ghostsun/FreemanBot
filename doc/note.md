@@ -41,3 +41,10 @@ inventory items
 inventory find wood 10
 inventory equip wood
 inventory unequip
+
+### dig
+#### test
+dig 10 _log woodChest
+
+dig 10 _log -8 63 173
+
