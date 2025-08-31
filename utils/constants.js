@@ -4,13 +4,14 @@
  */
 
 const RANGE_GOAL = 1;
+const OPEN_RANGE_GOAL = 3;
 
 const FIELDS = {
   'field1': {
     name: 'field1',
     position: { x: -6, y: 63, z: 167 , length: 18, width: 11},
     plant: 'wheat',
-    chest: { x: -8, y: 63, z: 178 }
+    chest: { x: -9, y: 63, z: 178 }
   }
 };
 
@@ -46,6 +47,7 @@ module.exports = {
   CONTAINERS,
   CONTAINER_TYPES,
   RANGE_GOAL,
+  OPEN_RANGE_GOAL,
   // 兼容 main.js
   fieldPosition,
   fieldChestPosition,

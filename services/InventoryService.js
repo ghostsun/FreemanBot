@@ -17,6 +17,7 @@ class InventoryService {
           type: item.type,
           metadata: item.metadata
         });
+      console.log(`${item.name} -- ${item.displayName}, x${item.count}, ${item.type}, ${item.metadata} (Slot: ${solt})`);
       }
     }
     return items;

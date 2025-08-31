@@ -6,7 +6,9 @@
 const { GoalNear, GoalBlock, GoalXZ, GoalY, GoalInvert, GoalFollow, GoalBreakBlock } = require('mineflayer-pathfinder').goals
 const { FIELDS, PLANT_AND_SEED, CAN_BE_OPEN_ITEMS } = require('../utils/constants');
 const { Vec3 } = require('vec3')
+const DepositService = require('./DepositService');
 class CareService {
+	depositService = new DepositService();
 	/**
 	 * 收获农作物
 	 * @param {object} bot - 机器人实例
@@ -19,7 +21,7 @@ class CareService {
 			let y = fieldPosition.y - 1;
 			let z = fieldPosition.z;
 			let direction = 1; // 1表示向东，-1表示向西
-			const chestPosition = field.chestPosition;
+			const chestPosition = field.chest;
 			const seedName = PLANT_AND_SEED.find(ps => ps.plant === field.plant)?.seed;
 			if (!seedName) {
 				console.error(`No seed type found for crop ${field.plant}, can't plant or harvest`);
@@ -207,6 +209,20 @@ class CareService {
 				z = nextPosition.z;
 				direction = nextPosition.direction;
 			}
+
+			// 收获完成后将作物送到箱子, 将收获的农作物全部放到箱子中，身上留下128个种子。
+			// 查看身上种子和农作物的数量
+			const seedCount = bot.inventory.items().filter(item => item.name === seedName).reduce((acc, item) => acc + item.count, 0);
+			const cropCount = bot.inventory.items().filter(item => item.name === field.plant).reduce((acc, item) => acc + item.count, 0);
+			const countToDepositSeed = seedCount <= 128 ? 0 : seedCount - 128;
+			const countToDepositCrop = cropCount;
+			console.log(`I have ${seedCount} ${seedName} and ${cropCount} ${field.plant}, deposit ${countToDepositSeed} ${seedName} and ${countToDepositCrop} ${field.plant} to chest`);
+			await this.depositService.deposit(bot, seedName, countToDepositSeed, chestPosition.x, chestPosition.y, chestPosition.z);
+			// 如果农作物和种子不同，则所有农作物都送到箱子中
+			if (seedName !== field.plant) {
+				await this.depositService.deposit(bot, field.plant, countToDepositCrop, chestPosition.x, chestPosition.y, chestPosition.z);
+			}
+			console.log(`Finished care of ${field.name} with ${field.plant}`);
 		} catch (error) {
 			console.error(error)
 			console.error(`Error in harvest: ${error.message}`);

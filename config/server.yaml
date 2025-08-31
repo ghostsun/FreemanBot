@@ -6,7 +6,8 @@ rangeGoal: 1
 # minecraft server settings
 host:
   # host: 'localhost'
-  host: '192.168.1.88'
+  host: '192.168.1.88' # version 1.21.6
+  # port: 64620
   port: 25565
   auth: 'offline'
   # version: '1.20.1'
