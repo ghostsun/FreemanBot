@@ -156,17 +156,14 @@ bot.once('spawn', () => {
     console.log(`My boss ${bossName} is talking to me!`)
     console.log("Command: " + command)
     // goto x y z
-    if (command.startsWith('goto')) {
-      // 调用GotoCommand实现
-      commandHandler.handleCommand(username, command, bot);
-    } else if (command.startsWith('looking')) {
-      // Route to LookingCommand via CommandHandler
-      commandHandler.handleCommand(username, command, bot);
-    } else if (command.startsWith('find')) {
-      // Route to FindCommand via CommandHandler
-      commandHandler.handleCommand(username, command, bot);
-    } else if (command.startsWith('care')) {
-      // Route to CareCommand via CommandHandler
+    if (command.startsWith('goto')
+      || command.startsWith('looking')
+      || command.startsWith('find')
+      || command.startsWith('care')
+      || command.startsWith('put')
+      || command.startsWith('dig')
+      || command.startsWith('bot')) {
+      // 调用CommandHandler
       commandHandler.handleCommand(username, command, bot);
     } else if (command.startsWith('open')) {
       const cmd = command.split(' ')
@@ -235,8 +232,6 @@ bot.once('spawn', () => {
         bot.chat(`/tell ${username} What's mean ${message} ?`)
       }
       return
-    } if (command.startsWith('put')){
-      commandHandler.handleCommand(username, command, bot)
     } else if (command.startsWith('plant')) {
       const cmd = command.split(' ')
       if (cmd.length === 2) {
@@ -246,8 +241,6 @@ bot.once('spawn', () => {
         bot.chat(`/tell ${username} What's mean ${message} ?`)
       }
       return
-    } else if (command.startsWith('dig')) {
-      commandHandler.handleCommand(username, command, bot)
     }
 
     switch (command) {
