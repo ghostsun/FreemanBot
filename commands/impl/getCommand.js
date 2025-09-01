@@ -79,64 +79,12 @@ class GetCommand extends Command {
         return;
       }
 
-      // 移动到容器附近
-      await bot.pathfinder.goto(new GoalNear(containerPos.x, containerPos.y, containerPos.z, 1)).then(() => {
-        console.log(`Arrived at container x: ${containerPos.x}, y: ${containerPos.y}, z: ${containerPos.z}`);
-      }).catch((error) => {
-        console.error(`Failed to reach container: ${error}`);
-        return;
-      });
-
-      // 打开容器
-      const containerBlock = await bot.blockAt(new Vec3(containerPos.x, containerPos.y, containerPos.z));
-      if (!containerBlock) {
-        console.error('Container block not found');
-        return;
-      }
-      await bot.openContainer(containerBlock).then(async () => {
-        console.log('Container opened');
-        // 遍历container中的物品，找到itemName的物品，取出itemCount数量的物品，直到取出足够数量的物品或遍历完所有物品
-        let itemTaken = 0;
-        for (const item of containerBlock.items()) {
-          if (item.name === itemName) {
-            const takeCount = Math.min(itemCount - itemTaken, item.count);
-            await containerBlock.withdraw(item.type, null, takeCount).then(() => {
-              itemTaken += takeCount;
-              console.log(`Took ${takeCount} ${itemName}, total ${itemTaken}`);
-            }).catch((error) => {
-              console.error(`Failed to take ${itemName}: ${error}`);
-            });
-            if (itemTaken >= itemCount) {
-              break;
-            }
-          }
-        }
-        if (itemTaken < itemCount) {
-          console.error(`Not enough ${itemName}, only took ${itemTaken}`);
-        } else {
-          console.log(`Took ${itemTaken} ${itemName}`);
-        }
-      }).catch((error) => {
-        console.error(`Failed to open container: ${error}`);
-        return;
-      }).finally(() => {
-        containerBlock.close();
-      });
+      const getService = new GetService();
+      await getService.getFromContainer(bot, itemCount, itemName, containerPos);
 
     } catch (error) {
       console.error('Error getting items:', error);
-      return;
     }
-  }
-
-  async findContainer(bot) {
-    // 查找64格范围内的容器，容器名称在CONTAINER_TYPES范围内
-    const containerBlock = await bot.findBlock({ matching: block => CONTAINER_TYPES.some(type => block.name === type), maxDistance: 64 });
-    if (!containerBlock) {
-      bot.chat('No container found');
-      return null;
-    }
-    return { x: containerBlock.x, y: containerBlock.y, z: containerBlock.z };
   }
 }
 

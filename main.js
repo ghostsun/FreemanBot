@@ -7,25 +7,76 @@ const config = require('./utils/config')
 const { Vec3 } = require('vec3')
 const readline = require('readline')
 const CommandHandler = require('./commands/commandHandler')
-const { FIELDS, PLANT_AND_SEED, CAN_BE_OPEN_ITEMS, fieldPosition, fieldChestPosition, plantAndSeed } = require('./utils/constants');
+const { FIELDS, PLANT_AND_SEED, CAN_BE_OPEN_ITEMS, plantAndSeed } = require('./utils/constants');
+const consoleManager = require('./utils/console');
+
 let commandHandler;
 
+// Global variables
+let fields = FIELDS;
+const fieldsMap = FIELDS;
+const fieldPosition = FIELDS['field1'].position;
+const fieldChestPosition = FIELDS['field1'].chest;
 
-// Load configuration
-config.load()
+// Initialize application
+async function initialize() {
+  try {
+    // Load configuration
+    config.load();
+    
+    return true;
+  } catch (error) {
+    console.error('Error initializing application:', error);
+    process.exit(1);
+  }
+}
+// Initialize the application and start the bot
+initialize()
+  .then(() => {
+    try {
+      // Start the bot after initialization is complete
+      startBot();
+      
+      // Show initial prompt if console is available
+      if (process.stdin.isTTY && consoleManager && typeof consoleManager.prompt === 'function') {
+        consoleManager.prompt();
+      }
+    } catch (error) {
+      console.error('Error starting bot:', error);
+      process.exit(1);
+    }
+  })
+  .catch(err => {
+    console.error(`Failed to initialize application: ${err}`);
+    process.exit(1);
+  });
 
-// Set up command line interface
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-  prompt: 'bot> '
-});
+function startBot() {
+  // Bot configuration
+  const options = {
+    host: config.get('host.host'),
+    port: config.get('host.port'),
+    username: config.get('auth.username'),
+    // version: config.get('version'),
+    auth: 'offline'
+  };
 
+  // Create bot instance
+  const bot = mineflayer.createBot(options);
+  
+  // Load plugins
+  bot.loadPlugin(pathfinder);
+  bot.loadPlugin(collectBlock);
 
+  // Initialize command handler
+  commandHandler = new CommandHandler();
+
+  // Other bot setup code...
+}
 
 async function handleCommand(username, command, bot) {
   if (username === 'console') {
-    console.log(`Executing command: ${command} from ${username}`);
+    consoleManager.debug(`Executing command: ${command} from ${username}`);
     if (command.startsWith('goto')) {
 
     }
@@ -34,28 +85,34 @@ async function handleCommand(username, command, bot) {
   }
 
   if (command === 'help') {
-    console.log('Available commands:');
-    console.log('  goto [x] <y> [z] [range] - Move to coordinates, range default to 1');
-    console.log('  looking <direction> - Look in a direction (north, south, east, west)');
-    console.log('  collect <block> - Collect the nearest block of type');
-    console.log('  help - Show this help');
-    console.log('  exit/quit - Exit the bot');
+    const helpText = [
+      'Available commands:',
+      '  goto [x] <y> [z] [range] - Move to coordinates, range default to 1',
+      '  looking <direction> - Look in a direction (north, south, east, west)',
+      '  collect <block> - Collect the nearest block of type',
+      '  help - Show this help',
+      '  exit/quit - Exit the bot'
+    ].join('\n');
+    consoleManager.log(helpText);
   } else {
     bot.emit('chat', username, command);
   }
 }
 
-// Handle command line input
-rl.on('line', async (line) => {
-  const command = line.trim();
-  if (command) {
-    await handleCommand('console', command, bot);
-  }
-  rl.prompt();
-}).on('close', () => {
-  console.log('Goodbye!');
-  process.exit(0);
-});
+// Handle command line input if running in TTY
+if (process.stdin.isTTY) {
+  consoleManager.onLine(async (line) => {
+    const command = line.trim();
+    if (command) {
+      await handleCommand('console', command, bot);
+    }
+  });
+
+  consoleManager.onClose(() => {
+    consoleManager.log('Goodbye!');
+    process.exit(0);
+  });
+}
 
 
 // Configuration
@@ -68,14 +125,11 @@ let currentStep = 0
 // 可以被open的物品数组
 const canBeOpenItems = ['chest', 'barrel']
 
-// 农田map，key为农田名称，value为农田信息。保存多块农田
-const fieldsMap = FIELDS
-
 
 // Debug logging helper
 function debugLog(message) {
   if (config.get('runningLevel') === 'debug') {
-    console.log(`[DEBUG] ${message}`)
+    consoleManager.debug(message);
   }
 }
 
@@ -89,14 +143,13 @@ const options = {
 
 const bot = mineflayer.createBot(options)
 
-console.log('FreemanBot has joined the server!')
+consoleManager.log('FreemanBot has joined the server!')
 
 const welcome = () => {
   bot.chat('Hi, I am ' + bot.username + ' and I am here to help you!')
 }
 // Display welcome message and prompt
-console.log('Bot console started. Type "help" for available commands.');
-rl.prompt();
+consoleManager.log('Bot console started. Type "help" for available commands.');
 
 bot.once('spawn', welcome)
 
@@ -153,8 +206,8 @@ bot.once('spawn', () => {
 
     const target = bot.players[username] ? bot.players[username].entity : null
 
-    console.log(`My boss ${bossName} is talking to me!`)
-    console.log("Command: " + command)
+    consoleManager.log(`My boss ${bossName} is talking to me!`)
+    consoleManager.debug(`Command: ${command}`)
     // goto x y z
     if (command.startsWith('goto')
       || command.startsWith('looking')
@@ -258,8 +311,8 @@ bot.once('spawn', () => {
         break
       case 'stop':
         bot.pathfinder.stop()
-        bot.clearControlStates()
-        console.log("Stopping !")
+          bot.clearControlStates()
+          console.log("Stopping !")
         break
       case 'go home':
         bot.quit()

@@ -4,11 +4,14 @@
  */
 // const { pathfinder, Movements } = require('mineflayer-pathfinder')
 const { GoalNear, GoalBlock, GoalXZ, GoalY, GoalInvert, GoalFollow, GoalBreakBlock } = require('mineflayer-pathfinder').goals
-const { FIELDS, PLANT_AND_SEED, CAN_BE_OPEN_ITEMS } = require('../utils/constants');
+const { FIELDS, PLANT_AND_SEED, CAN_BE_OPEN_ITEMS, OPEN_RANGE_GOAL } = require('../utils/constants');
 const { Vec3 } = require('vec3')
 const DepositService = require('./depositService');
+const GetService = require('./getService');
+
 class CareService {
 	depositService = new DepositService();
+	getService = new GetService();
 	/**
 	 * 收获农作物
 	 * @param {object} bot - 机器人实例
@@ -31,63 +34,57 @@ class CareService {
 			const hoeItem = bot.inventory.items().find((item) => item.name.endsWith('_hoe'));
 			if (!hoeItem) {
 				console.log('No hoe found in inventory, need to get one from chest');
-				await bot.pathfinder.goto(new GoalNear(chestPosition.x, chestPosition.y, chestPosition.z, 1)).then(async () => {
-					const chestBlock = bot.findBlock({
-						matching: (block) => {
-							return block && block.type === bot.registry.blocksByName.chest.id;
-						},
-						maxDistance: 2
+				if (!(bot.entity.position.distanceTo(new Vec3(chestPosition.x, chestPosition.y, chestPosition.z)) < OPEN_RANGE_GOAL)) {
+					await bot.pathfinder.goto(new GoalNear(chestPosition.x, chestPosition.y, chestPosition.z, OPEN_RANGE_GOAL)).then(async () => {
+						console.log(`Reached chest at ${chestPosition.x}, ${chestPosition.y}, ${chestPosition.z}`);
+					}).catch((err) => {
+						console.error(`Failed to reach chest at ${chestPosition.x}, ${chestPosition.y}, ${chestPosition.z}: ${err.message}`);
+						return;
 					});
-					if (chestBlock) {
-						bot.openContainer(chestBlock).then(async (chest) => {
-							const chestHoe = chest.items().find((item) => item.name.endsWith('_hoe'));
-							if (chestHoe) {
-								await chest.withdraw(chestHoe.type, null, 1).then(() => {
+				}
+				const chestBlock = await bot.findBlock({
+					matching: (block) => {
+						return block.type === bot.registry.blocksByName.chest.id;
+					},
+					maxDistance: OPEN_RANGE_GOAL
+				});
+				if (chestBlock) {
+					console.log(`Found chest at ${chestBlock.position.x}, ${chestBlock.position.y}, ${chestBlock.position.z}`);
+					await bot.openContainer(chestBlock).then(async (openedContainer) => {
+						// const chestHoe = openedContainer.items().find((item) => item.name.endsWith('_hoe'));
+						for (const item of openedContainer.containerItems()) {
+							console.log(`${item.name} -- ${item.displayName}, ${item.name.endsWith('_hoe') ? 'hoe' : 'not hoe'}`);
+							if (item.name.endsWith('_hoe')) {
+								const chestHoe = item;
+								await openedContainer.withdraw(chestHoe.type, null, 1).then(() => {
 									console.log(`I have taken a ${chestHoe.name} from the chest`);
 								}).catch((error) => {
 									console.error(`I can't take a ${chestHoe.name} from the chest, because ${error}`);
 								});
-							} else {
-								console.error('No hoe found in chest');
 							}
-							// 取种子
-							// 检查身上是否带有足够的种子，遍历身上物品将seedName的数量加起来
-							if (seedName) {
-								const seedCountInInventory = bot.inventory.items().filter((item) => item.name === seedName).reduce((acc, item) => acc + item.count, 0);
-								const fieldBlockCount = fieldPosition.width * fieldPosition.length;
-								if (seedCountInInventory < fieldBlockCount) {
-									const seedNeeded = fieldBlockCount - seedCountInInventory;
-									// 遍历chest物品，找到seedName的物品便取出，直到取够seedNeeded数量或者遍历完chest中的物品
-									let seedTaken = 0;
-									for (const item of chest.items()) {
-										if (item.name === seedName) {
-											const takeCount = Math.min(item.count, seedNeeded - seedTaken);
-											await chest.withdraw(item.type, null, takeCount).then(() => {
-												seedTaken += takeCount;
-												console.log(`I have taken ${takeCount} ${seedName} from the chest`);
-											}).catch((error) => {
-												console.error(`I can't take ${takeCount} ${seedName} from the chest, because ${error}`);
-											});
-											if (seedTaken >= seedNeeded) {
-												break;
-											}
-										}
-									}
-								} else {
-									console.log(`I have enough ${seedName} in my inventory`);
-								}
-							}
-							await chest.close();
-						}).catch((error) => {
-							console.error(`I can't open the chest, because ${error}`);
-						});
-					} else {
-						console.error('No chest found near the chest position');
-					}
-				}).catch((err) => {
-					console.error(`Failed to reach chest at ${chestPosition.x}, ${chestPosition.y}, ${chestPosition.z}: ${err.message}`);
-					return;
-				});
+						}
+						await openedContainer.close();
+					}).catch((err) => {
+						console.error(err)
+						console.error(`Failed to open chest: ${err}`);
+					});
+				} else {
+					console.error('No chest found near the chest');
+				}
+			}
+
+			// 取种子
+			// 检查身上是否带有足够的种子，遍历身上物品将seedName的数量加起来
+			if (seedName) {
+				const seedCountInInventory = bot.inventory.items().filter((item) => item.name === seedName).reduce((acc, item) => acc + item.count, 0);
+				const fieldBlockCount = fieldPosition.width * fieldPosition.length;
+				if (seedCountInInventory < fieldBlockCount) {
+					const seedNeeded = fieldBlockCount - seedCountInInventory;
+					// 遍历chest物品，找到seedName的物品便取出，直到取够seedNeeded数量或者遍历完chest中的物品
+					await this.getService.getFromContainer(bot, seedNeeded, seedName, field.chest, true);
+				} else {
+					console.log(`I have enough ${seedName} in my inventory`);
+				}
 			}
 
 			// 开始收获和种植
@@ -135,7 +132,7 @@ class CareService {
 							}).catch((error) => {
 								console.error(`I can't equip a ${hoeItem.name} to till the land, because ${error}`)
 							});
-							
+
 						} else {
 							console.error('No hoe found in inventory to till the land');
 						}

@@ -32,10 +32,10 @@ class CareCommand extends Command {
 	console.log(`Field: ${fieldName}, Crop: ${cropType}, Seed: ${seedType}`);
 
     // Only wheat is supported in this example
-    if (cropType !== 'wheat') {
-      console.error(`Unsupported crop type: ${cropType}`);
-      return;
-    }
+    // if (cropType !== 'wheat') {
+    //   console.error(`Unsupported crop type: ${cropType}`);
+    //   return;
+    // }
 
     // Check if already doing a task
     if (bot.currentTask) {
