@@ -1,3 +1,5 @@
+const consoleManager = require('../utils/console');
+
 class BotService {
   constructor() {
     this.version = '1.0.0';

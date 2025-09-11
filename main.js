@@ -5,7 +5,6 @@ const collectBlock = require('mineflayer-collectblock').plugin
 const { GoalNear, GoalBlock, GoalXZ, GoalY, GoalInvert, GoalFollow, GoalBreakBlock } = require('mineflayer-pathfinder').goals
 const config = require('./utils/config')
 const { Vec3 } = require('vec3')
-const readline = require('readline')
 const CommandHandler = require('./commands/commandHandler')
 const { FIELDS, PLANT_AND_SEED, CAN_BE_OPEN_ITEMS, plantAndSeed } = require('./utils/constants');
 const consoleManager = require('./utils/console');
@@ -23,7 +22,7 @@ async function initialize() {
   try {
     // Load configuration
     config.load();
-    
+
     return true;
   } catch (error) {
     console.error('Error initializing application:', error);
@@ -36,7 +35,7 @@ initialize()
     try {
       // Start the bot after initialization is complete
       startBot();
-      
+
       // Show initial prompt if console is available
       if (process.stdin.isTTY && consoleManager && typeof consoleManager.prompt === 'function') {
         consoleManager.prompt();
@@ -63,7 +62,7 @@ function startBot() {
 
   // Create bot instance
   const bot = mineflayer.createBot(options);
-  
+
   // Load plugins
   bot.loadPlugin(pathfinder);
   bot.loadPlugin(collectBlock);
@@ -192,7 +191,7 @@ bot.once('spawn', () => {
   })
 
 
-  bot.on('chat', (username, message) => {
+  bot.on('chat', async (username, message) => {
     debugLog(`Message from ${username}: ${message}`)
     const defaultMove = new Movements(bot)
     defaultMove.allowSprinting = false
@@ -262,29 +261,7 @@ bot.once('spawn', () => {
         return
       }
     } else if (command.startsWith('get')) {
-      const cmd = command.split(' ')
-      console.log(cmd)
-      if (cmd.length === 2) {
-        const item = cmd[1]
-        getThingsFromContainer(item, 1, 'chest')
-      } else if (cmd.length === 3) {
-        const item = cmd[1]
-        const count = parseInt(cmd[2])
-        // 判断count是否为数字
-        if (isNaN(count)) {
-          getThingsFromContainer(item, 1, cmd[2])
-        } else {
-          getThingsFromContainer(item, count, 'chest')
-        }
-      } else if (cmd.length === 4) {
-        const item = cmd[1]
-        const count = parseInt(cmd[2])
-        const container = cmd[3]
-        getThingsFromContainer(item, count, container)
-      } else {
-        bot.chat(`/tell ${username} What's mean ${message} ?`)
-      }
-      return
+      commandHandler.handleCommand(username, command, bot)
     } else if (command.startsWith('plant')) {
       const cmd = command.split(' ')
       if (cmd.length === 2) {
@@ -311,8 +288,8 @@ bot.once('spawn', () => {
         break
       case 'stop':
         bot.pathfinder.stop()
-          bot.clearControlStates()
-          console.log("Stopping !")
+        bot.clearControlStates()
+        console.log("Stopping !")
         break
       case 'go home':
         bot.quit()
@@ -322,24 +299,28 @@ bot.once('spawn', () => {
       case 'w':
       case 'W':
         bot.setControlState('forward', true)
+        await bot.waitForTicks(2)
         bot.setControlState('forward', false)
         break
       case 'back':
       case 's':
       case 'S':
         bot.setControlState('back', true)
+        await bot.waitForTicks(2)
         bot.setControlState('back', false)
         break
       case 'left':
       case 'a':
       case 'A':
         bot.setControlState('left', true)
+        await bot.waitForTicks(2)
         bot.setControlState('left', false)
         break
       case 'right':
       case 'd':
       case 'D':
         bot.setControlState('right', true)
+        await bot.waitForTicks(2)
         bot.setControlState('right', false)
         break
       case 'stop controls':
@@ -348,6 +329,7 @@ bot.once('spawn', () => {
       case 'jump':
       case ' ':
         bot.setControlState('jump', true)
+        await bot.waitForTicks(2)
         bot.setControlState('jump', false)
         break
       case 'attack':

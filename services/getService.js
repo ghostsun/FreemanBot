@@ -34,10 +34,10 @@ class GetService {
                 // const chestHoe = openedContainer.items().find((item) => item.name.endsWith('_hoe'));
                 for (const item of openedContainer.containerItems()) {
                     let matched = false;
-                    if (isExact) {
-                        console.log('exact match', itemName, item.name);
-                        if (item.name === itemName) matched = true;
-                    } else {
+                    // if (isExact) {
+                    //     console.log('exact match', itemName, item.name);
+                    //     if (item.name === itemName) matched = true;
+                    // } else {
                         // 在itemName中查找包含'_'位置，如果在最前面则匹配endWith，如果在后面则匹配startsWith，如果前后都有则匹配includes
                         const index = itemName.indexOf('_');
                         if (index === 0) {
@@ -52,9 +52,9 @@ class GetService {
                             const matchName = itemName.slice(0, itemName.length - 1);
                             if (item.name.startsWith(matchName)) matched = true;
                         } else {
-                            if (item.name.includes(itemName)) matched = true;
+                            if (item.name === itemName) matched = true;
                         }
-                    }
+                    // }
                     if (matched) {
                         console.log(`Found item: ${item.name} -- ${item.displayName}, x${item.count}, ${item.type}, ${item.metadata}`);
                         const withdrawCount = Math.min(item.count, count - itemToken);
