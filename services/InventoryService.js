@@ -6,6 +6,7 @@ class InventoryService {
   // List all items in the bot's inventory
   listItems(bot, itemName, exactMatch = false) {
     const items = [];
+    const itemMaps = new Map();
     for (let solt = 0; solt < bot.inventory.slots.length; solt++) {
       const item = bot.inventory.slots[solt];
       if (item) {
@@ -23,7 +24,15 @@ class InventoryService {
           items.push({ slot: solt, name: item.name, displayName: item.displayName, count: item.count, type: item.type, metadata: item.metadata });
           console.log(`${item.name} -- ${item.displayName}, x${item.count}, ${item.type}, ${item.metadata} (Slot: ${solt})`);
         }
+        if (itemMaps.has(item.name)) {
+          itemMaps.set(item.name, itemMaps.get(item.name) + item.count);
+        } else {
+          itemMaps.set(item.name, item.count);
+        }
       }
+    }
+    for (const item of itemMaps.entries()) {
+      console.log(`${item[0]} -- ${item[1]}`);
     }
     return items;
   }

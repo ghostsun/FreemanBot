@@ -1,5 +1,5 @@
 const Command = require('../baseCommand');
-const { FIELDS, PLANT_AND_SEED } = require('../../utils/constants');
+const { FIELDS, PLANT_AND_SEED, PLANT_INFO } = require('../../utils/constants');
 const CareService = require('../../services/CareService');
 
 class CareCommand extends Command {
@@ -27,7 +27,7 @@ class CareCommand extends Command {
 		return;
 	}
     const cropType = field.plant;
-	const seedType = PLANT_AND_SEED.find(ps => ps.plant === cropType)?.seed;
+	const seedType = PLANT_INFO.find(pi => pi.plant === cropType)?.seed;
 
 	console.log(`Field: ${fieldName}, Crop: ${cropType}, Seed: ${seedType}`);
 

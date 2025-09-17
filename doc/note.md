@@ -9,6 +9,43 @@
 农田用品，收获物品存放的箱子位置
 * -8, 63, 178
 
+### 1.21.8 农田坐标
+
+#### 小麦田 02w1
+* 西北角 -188, 64, -988, length: 13, width: 6
+* 东南角 -182, 64, -975
+* 小麦田箱子，-178, 64, -991
+
+#### 小麦田 02w2
+* 西北角 -208, 63, -964, length: 6, width: 6
+* 东南角 -202, 63, -958
+* 小麦田箱子，-178, 64, -991
+
+#### 小麦田 02w3
+* 西北角 -215, 63, -960, length: 6, width: 6
+* 东南角 -209, 63, -954
+* 小麦田箱子，-178, 64, -991
+
+#### 小麦田 02w4
+* 西北角 -222, 63, -959, length: 7, width: 6
+* 东南角 -216, 63, -952
+* 小麦田箱子，-178, 64, -991
+
+#### 甜菜田 02b1
+* 西北角 -181, 64, -988, length: 20, width: 6
+* 东南角 -175, 64, -968
+* 甜菜田箱子，-175, 64, -991
+
+#### 胡萝卜 02c1
+* 西北角 -188, 64, -974, length: 6, width: 6
+* 东南角 -182, 64, -968
+
+#### 土豆 02p1
+* 西北角 -188, 65, -966, length: 5, width: 13
+* 东南角 -175, 65, -959
+
+
+
 ## commands
 ### goto
 #### test
@@ -47,4 +84,27 @@ inventory unequip
 dig 10 _log woodChest
 
 dig 10 _log -8 63 173
+
+#### birch_log
+name birch_log
+chest 0020
+dig 10 birch_log 0020
+
+
+### care
+#### 02w1
+care 02w1
+
+
+### sleep
+#### test
+sleep list
+sleep go smcb
+sleep on smcb
+sleep off
+
+### compost
+#### test
+compost add smcb wheat_seeds 64
+compost add smcb beetroot_seeds
 

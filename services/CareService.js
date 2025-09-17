@@ -4,7 +4,7 @@
  */
 // const { pathfinder, Movements } = require('mineflayer-pathfinder')
 const { GoalNear, GoalBlock, GoalXZ, GoalY, GoalInvert, GoalFollow, GoalBreakBlock } = require('mineflayer-pathfinder').goals
-const { FIELDS, PLANT_AND_SEED, CAN_BE_OPEN_ITEMS, OPEN_RANGE_GOAL } = require('../utils/constants');
+const { FIELDS, PLANT_AND_SEED, CAN_BE_OPEN_ITEMS, OPEN_RANGE_GOAL, PLANT_INFO, PLANT_INFO_MAP } = require('../utils/constants');
 const { Vec3 } = require('vec3')
 const DepositService = require('./depositService');
 const GetService = require('./getService');
@@ -92,16 +92,17 @@ class CareService {
 			while (true) {
 				await bot.pathfinder.goto(new GoalXZ(x, z)).then(async () => {
 					console.log(`I have arrived at ${bot.entity.position}`);
-					// 查找附近1格内的成熟小麦（metadata 7表示成熟）
-					const wheat = await bot.findBlock({
+					// 查找附近1格内的成熟农作物（metadata 7表示成熟）
+					const plant = await bot.findBlock({
 						maxDistance: 1,
 						matching: (block) => {
-							return block && block.type === bot.registry.blocksByName.wheat.id && block.metadata === 7;
+							return block && block.type === bot.registry.blocksByName[PLANT_INFO_MAP.get(field.plant)?.block].id 
+							&& block.metadata === PLANT_INFO_MAP.get(field.plant)?.metadata;
 						}
 					});
-					if (wheat) {
-						console.log(`Harvesting ${field.plant} at ${wheat.position}`);
-						await bot.dig(wheat);
+					if (plant) {
+						console.log(`Harvesting ${field.plant} at ${plant.position}`);
+						await bot.dig(plant);
 						console.log(`I have harvested ${field.plant} at ${bot.entity.position}`);
 					} else {
 						console.log(`No mature ${field.plant} to harvest at ${bot.entity.position}`);
@@ -216,8 +217,8 @@ class CareService {
 			console.log(`I have ${seedCount} ${seedName} and ${cropCount} ${field.plant}, deposit ${countToDepositSeed} ${seedName} and ${countToDepositCrop} ${field.plant} to chest`);
 			await this.depositService.deposit(bot, seedName, countToDepositSeed, chestPosition.x, chestPosition.y, chestPosition.z);
 			// 如果农作物和种子不同，则所有农作物都送到箱子中
-			if (seedName !== field.plant) {
-				await this.depositService.deposit(bot, field.plant, countToDepositCrop, chestPosition.x, chestPosition.y, chestPosition.z);
+			if (seedName !== PLANT_INFO_MAP.get(field.plant).item) {
+				await this.depositService.deposit(bot, PLANT_INFO_MAP.get(field.plant).item, countToDepositCrop, chestPosition.x, chestPosition.y, chestPosition.z);
 			}
 			console.log(`Finished care of ${field.name} with ${field.plant}`);
 		} catch (error) {

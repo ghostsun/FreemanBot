@@ -11,7 +11,11 @@ class Command {
   }
 
   sendUsage(username) {
-    this.bot.chat(`Usage: ${this.name} ${this.usage}`);
+    if (this.bot) {
+      this.bot.chat(`Usage: ${this.name} ${this.usage}`);
+    } else {
+      console.log(`Usage: ${this.name} ${this.usage}`);
+    }
   }
 }
 

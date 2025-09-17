@@ -61,7 +61,7 @@ function startBot() {
   };
 
   // Create bot instance
-  const bot = mineflayer.createBot(options);
+  // const bot = mineflayer.createBot(options);
 
   // Load plugins
   bot.loadPlugin(pathfinder);
@@ -214,7 +214,12 @@ bot.once('spawn', () => {
       || command.startsWith('care')
       || command.startsWith('put')
       || command.startsWith('dig')
-      || command.startsWith('bot')) {
+      || command.startsWith('bot')
+      || command.startsWith('compost')
+      || command.startsWith('get')
+      || command.startsWith('plant')
+      || command.startsWith('sleep')
+    ) {
       // 调用CommandHandler
       commandHandler.handleCommand(username, command, bot);
     } else if (command.startsWith('open')) {
